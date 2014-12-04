@@ -43,9 +43,9 @@ parser.set_defaults(MQ0threshold="0.05")
 parser.set_defaults(DPthreshold="3")
 parser.set_defaults(MAFthreshold="0.01")
 parser.set_defaults(GQthreshold="30")
-parser.set_defaults(CHTthreshold="0.2")
+parser.set_defaults(CHTthreshold="0.05")
 parser.set_defaults(HetAllCountthreshold="3")
-parser.set_defaults(HomAllFracthreshold="0.8")
+parser.set_defaults(HomAllFracthreshold="0.7")
 
 ## b        k l    p q  s t   w  y z 
 
@@ -163,7 +163,7 @@ if not NoPatho:
 Outlog.write("\n")
 
 #Start output table
-headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.1KG','AlleleFrequency.ESP','SIFTprediction','PP2prediction','MTprediction','GERP++','CADDscore','PredictionSummary']+AlternateSampleList+HeterozygousSampleList+ReferenceSampleList+NotReferenceSampleList+NotAlternateSampleList+NotFilteredSampleList+['AlternateAlleles', 'FILTER', 'INFO']+AlternateSampleList+HeterozygousSampleList+ReferenceSampleList+NotReferenceSampleList+NotAlternateSampleList+NotFilteredSampleList
+headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','PredictionSummary','SegmentalDuplication']+AlternateSampleList+HeterozygousSampleList+ReferenceSampleList+NotReferenceSampleList+NotAlternateSampleList+NotFilteredSampleList+['AlternateAlleles', 'FILTER', 'INFO']+AlternateSampleList+HeterozygousSampleList+ReferenceSampleList+NotReferenceSampleList+NotAlternateSampleList+NotFilteredSampleList
 Output.write("\t".join(headerlist)+"\n")
 
 # Read VCF file
@@ -238,28 +238,28 @@ for line in VCF:
         MQ0number=float(INFOdict.get('MQ0','.'))
         GeneName=INFOdict.get('GeneName','.')
         VariantFunction=INFOdict.get('VarFunc','none')
+        SegDup=INFOdict.get('SegDup','none')
         
         KGFreqList=str(INFOdict.get('1KGfreq','.'))
         KGFreqList=KGFreqList.split(',')
         ESPFreqList=str(INFOdict.get('ESPfreq','.'))
         ESPFreqList=ESPFreqList.split(',')
+        ExACFreqList=str(INFOdict.get('ExACfreq','.'))
+        ExACFreqList=ExACFreqList.split(",")
         VCFFreqList=str(INFOdict.get('AF',0))
         VCFFreqList=VCFFreqList.split(",")
+        
         
         VariantClassList=INFOdict.get('VarClass','none')
         VariantClassList=VariantClassList.split(',')
         AAchangeList=INFOdict.get('AAChange','.')
         AAchangeList=AAchangeList.split(',')
-        SIFTscoreList=str(INFOdict.get('SIFTscr','.'))
-        SIFTscoreList=SIFTscoreList.split(',')
         SIFTpredictionList=INFOdict.get('SIFTprd','.')
         SIFTpredictionList=SIFTpredictionList.split(',')
-        PP2scoreList=str(INFOdict.get('PP2.hvar.scr','.'))
-        PP2scoreList=PP2scoreList.split(',')
         PP2predictionList=INFOdict.get('PP2.hvar.prd','.')
         PP2predictionList=PP2predictionList.split(',')
-        MTscoreList=str(INFOdict.get('MutTscr','.'))
-        MTscoreList=MTscoreList.split(',')
+        MApredictionList=INFOdict.get('MutAprd','.')
+        MApredictionList=MApredictionList.split(',')
         MTpredictionList=INFOdict.get('MutTprd','.')
         MTpredictionList=MTpredictionList.split(',')
         GERPscoreList=str(INFOdict.get('GERP','.'))
@@ -422,6 +422,17 @@ for line in VCF:
                     ESPFreqtest=float(ESPFreq)
                 if ESPFreqtest <= MAFfilter:
                     PassESP=True
+                    
+                # Check if ExAC passes threshold
+                PassExAC=False
+                cltnum=min(len(ExACFreqList)-1, altnum)
+                ExACFreq=str(ExACFreqList[cltnum])
+                if ExACFreq == ".":
+                    ExACFreqtest=float(0)
+                else:
+                    ExACFreqtest=float(ExACFreq)
+                if ExACFreqtest <= MAFfilter:
+                    PassExAC=True
                 
                 # Check if VCF passes threshold
                 PassVCF=False
@@ -437,30 +448,8 @@ for line in VCF:
                     PassGT=True
                 
                 #Check alternate allele counts and fractions
-                passBasicACF=False
-                if all( i >= HetAllCountFilter for i in HeterozygousAC) and all( i >= HomAllFrac for i in AlternateAAF) and all( i >= HomAllFrac for i in ReferenceAAF):
-                    passBasicACF=True
-                
-                passNotRefAFC=False
-                for NotRefGT in NotReferenceGT:
-                    if NotRefGT.count(AltAll) == 1 and NotReferenceAC >= HetAllCountFilter:
-                        passNotRefAFC=True
-                    if NotRefGT.count(AltAll) == 2 and NotReferenceAAF >= AlternateAAF:
-                        passNotRefAFC=True
-                if not NotReferenceGT:
-                    passNotRefAFC=True
-                
-                passNotAltAFC=False
-                for NotAltGT in NotAlternateGT:
-                    if NotAltGT.count(AltAll) == 1 and NotAlternateAAC >= HetAllCountFilter:
-                        passNotAltAFC=True
-                    if NotAltGT.count(AltAll) == 0 and NotAlternateRAF >= AlternateAAF:
-                        passNotAltAFC=True
-                if not NotAlternateGT:
-                    passNotAltAFC=True
-                
                 PassAFC=False
-                if passBasicACF and passNotRefAFC and passNotAltAFC:
+                if all( i >= HetAllCountFilter for i in HeterozygousAC) and all( i >= HomAllFrac for i in AlternateAAF) and all( i >= HomAllFrac for i in ReferenceAAF):
                     PassAFC=True
                 
                 PassPatho=False
@@ -506,17 +495,19 @@ for line in VCF:
                 
                 cltnum=min(len(AAchangeList)-1, altnum)
                 AAchange=AAchangeList[cltnum]
+                cltnum=min(len(MApredictionList)-1, altnum)
+                MAprediction=MApredictionList[cltnum]
                 cltnum=min(len(MTpredictionList)-1, altnum)
                 MTprediction=MTpredictionList[cltnum]
                 #output
                 if DeBug:
-                    OutPass.write("\t"+linelist[0]+" "+linelist[1]+" "+linelist[3]+" "+linelist[4]+" "+str(altnum)+" "+str(PassKG)+" "+str(PassESP)+" "+str(PassVCF)+" "+str(PassMQ)+" "+str(PassFunction)+" "+str(PassClass)+" "+str(PassGT)+" "+str(PassDP)+" "+str(PassGQ)+" "+str(PassPatho)+" "+str(PassFilter)+" "+str(PassAFC)+"\n")
+                    OutPass.write("\t"+linelist[0]+" "+linelist[1]+" "+linelist[3]+" "+linelist[4]+" "+str(altnum)+" "+str(PassExAC)+" "+str(PassKG)+" "+str(PassESP)+" "+str(PassVCF)+" "+str(PassMQ)+" "+str(PassFunction)+" "+str(PassClass)+" "+str(PassGT)+" "+str(PassDP)+" "+str(PassGQ)+" "+str(PassPatho)+" "+str(PassFilter)+" "+str(PassAFC)+"\n")
                 # If all pass then output line
-                if PassKG and PassESP and PassVCF and PassGT and PassDP and PassGQ and PassPatho and PassFilter and PassAFC:
+                if PassKG and PassESP and PassExAC and PassVCF and PassGT and PassDP and PassGQ and PassPatho and PassFilter and PassAFC:
                     REF=str(REFlist[altnum])
                     cltnum=min(len(GERPscoreList)-1, altnum)
                     GERPscore=str(GERPscoreList[cltnum])
-                    OutputList=linelist[0:4]+[REF,GeneName,VariantFunction,VariantClass,AAchange,KGFreq,ESPFreq,SIFTprediction,PP2prediction,MTprediction,GERPscore,CADDscore,PathoLevel]+AlternateGT+HeterozygousGT+ReferenceGT+NotReferenceGT+NotAlternateGT+NotFilteredGT+[REFstring,VariantFilter,INFOstring]+AlternateQualityString+HeterozygousQualityString+ReferenceQualityString+NotReferenceQualityString+NotAlternateQualityString+NotFilteredQualityString
+                    OutputList=linelist[0:4]+[REF,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,PathoLevel,SegDup]+AlternateGT+HeterozygousGT+ReferenceGT+NotReferenceGT+NotAlternateGT+NotFilteredGT+[REFstring,VariantFilter,INFOstring]+AlternateQualityString+HeterozygousQualityString+ReferenceQualityString+NotReferenceQualityString+NotAlternateQualityString+NotFilteredQualityString
                     OutputList= [ str(i) for i in OutputList ]
                     OutputString="\t".join(OutputList)
                     Output.write(OutputString+"\n")
