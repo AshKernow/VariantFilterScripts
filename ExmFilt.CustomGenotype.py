@@ -260,8 +260,8 @@ for line in VCF:
         SampleNum=len(linelist)-9
         
         ##Get Alternate Alleles
-        AltAlls=linelist[4]
-        AltAlls=AltAlls.split(",")
+        AltAllsStr=linelist[4]
+        AltAlls=AltAllsStr.split(",")
         AltNum=len(AltAlls)
         
         QUAL=float(linelist[5])
@@ -276,8 +276,8 @@ for line in VCF:
                 FieldName,FieldValue=element.split('=',1)
                 INFOdict[FieldName]=FieldValue
         
-        DPnumber=float(INFOdict.get('DP','.'))
-        MQ0number=float(INFOdict.get('MQ0','.'))
+        DPnumber=float(INFOdict.get('DP','1'))
+        MQ0number=float(INFOdict.get('MQ0','0'))
         GeneName=INFOdict.get('GeneName','.')
         VariantFunction=INFOdict.get('VarFunc','none')
         SegDup=INFOdict.get('SegDup','none')
@@ -579,6 +579,10 @@ for line in VCF:
                     FILTER='Medium'
                 if VariantClass not in InDelClass and any( str(i) in VariantFilter for i in MidSnpFilters):
                     FILTER='Medium'
+                if VariantClass in InDelClass and any( str(i) in VariantFilter for i in BadInDFilters):
+                    FILTER='Low'
+                if VariantClass not in InDelClass and any( str(i) in VariantFilter for i in BadSnpFilters):
+                    FILTER='Low'
                 
                 ################################################################################################################
                 ##### OUTPUTS                                                                                                ###
@@ -599,7 +603,7 @@ for line in VCF:
                     ALT=str(AltAlls[altnum])
                     cltnum=min(len(GERPscoreList)-1, altnum)
                     GERPscore=str(GERPscoreList[cltnum])
-                    OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,SegDup,PathoLevel,FILTER]+AlternateGT+HeterozygousGT+ReferenceGT+NotReferenceGT+NotAlternateGT+NotFilteredGT+[AltAlls,VariantFilter,INFOstring]+AlternateQualityString+HeterozygousQualityString+ReferenceQualityString+NotReferenceQualityString+NotAlternateQualityString+NotFilteredQualityString
+                    OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,SegDup,PathoLevel,FILTER]+AlternateGT+HeterozygousGT+ReferenceGT+NotReferenceGT+NotAlternateGT+NotFilteredGT+[AltAllsStr,VariantFilter,INFOstring]+AlternateQualityString+HeterozygousQualityString+ReferenceQualityString+NotReferenceQualityString+NotAlternateQualityString+NotFilteredQualityString
                     OutputList= [ str(i) for i in OutputList ]
                     OutputString="\t".join(OutputList)
                     Output.write(OutputString+"\n")
