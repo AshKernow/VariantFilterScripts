@@ -8,10 +8,11 @@ source /ifs/home/c2b2/af_lab/ads2202/.bash_profile
 fi
 
 #get arguments
-while getopts v:t:n: opt; do
+while getopts v:t:n:p: opt; do
     case "$opt" in
         v) VcfFil="$OPTARG";;
         t) SingFil="$OPTARG";;
+        p) AddPrm="$OPTARG";;
         n) DirPre="$OPTARG";;
         #H) echo "$usage"; exit;;
     esac
@@ -34,18 +35,25 @@ cd $DirNam
 
 #Autosomal Recessive
 echo "Autosomal Recessive.."
-$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.AR --alt $Proband
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $Proband.AR --alt $Proband"
+if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
+echo $CMD
+eval $CMD
+
 #Autosomal Dominant
 echo "Autosomal Dominant.."
-$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.AD  --het $Proband
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $Proband.AD  --het $Proband"
+if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
+echo $CMD
+eval $CMD
 R --vanilla <<RSCRIPT
 options(stringsAsFactors=F)
 
-het <- read.delim("$FamNam.AD.tsv")
+het <- read.delim("$Proband.AD.tsv")
 
 gens <- unique(het[duplicated(het[,"Gene"]),"Gene"])
 
 comphet <- het[het[,"Gene"]%in%gens,]
 
-write.table(comphet, "$FamNam.filter.compound_heterozygous.tsv", col.names=T, row.names=F, quote=F, sep="\t")
+write.table(comphet, "$Proband.compound_heterozygous.tsv", col.names=T, row.names=F, quote=F, sep="\t")
 RSCRIPT
