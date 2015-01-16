@@ -27,6 +27,7 @@ parser.add_option("-v", "--vcf", dest="VCFfile",help="Input VCF file", metavar="
 parser.add_option("-o", "--out", dest="OutputFileName",help="Base of names for output files", metavar="OutputFileName")
 
 ## Assign samples to heterozygous, homozygous or reference for genotype filtering
+parser.set_defaults(sampleIDs="ALL")
 parser.add_option("-s", "--sam", dest="sampleIDs",help="Samples IDs, must match vcf CHROM line", metavar="sampleIDs")
 parser.add_option("-g", "--gene", dest="geneName",help="Gene Symbol to search for in the INFO field", metavar="geneName")
 
@@ -72,12 +73,13 @@ Outlog.write("\n")
 Outlog.write("Samples: "+str(Samples)+"\n")
 Outlog.write("Gene: "+str(SearchGene)+"\n")
 
-##Start output tables
-headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','SegmentalDuplication']+Sample+['FILTER', 'INFO']+Sample
-Output.write("\t".join(headerlist)+"\n")
-
 #adjust search term to get exact matchs only
 SearchGene='='+SearchGene+";"
+
+#initialise arrays
+NameToColumn={}
+ColumnToName={}
+BadGT=['./.', '0/0']
 
 for line in VCF:
     if '#' in line:
@@ -86,11 +88,19 @@ for line in VCF:
     ################################################################################################################
     ##### MAP COLUMN NAME TO NUMBER AND THEN LIST COLUMN NUMBERS CORRESPONDING TO EACH SAMPLE                    ###
     ################################################################################################################
-        ColumnAndNumber=enumerate(line.strip().upper().split("\t"))
+        linelist=line.strip().split("\t")
+        ColumnAndNumber=enumerate(linelist)
+        print Sample
+        if Sample[0]=="ALL":
+            Sample=linelist[9:]
+            print Sample
         for i in ColumnAndNumber:
             NameToColumn[i[1]]=i[0]
             ColumnToName[i[0]]=i[1]
         ColumnNumber=[ NameToColumn[i] for i in Sample ]
+        ##Start output tables
+        headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','SegmentalDuplication']+Sample+['FILTER', 'INFO']+Sample
+        Output.write("\t".join(headerlist)+"\n")
     if '#' not in line:
         ################################################################################################################
         ##### PARSE LINE AND GET VARIANT INFO                                                                        ###
@@ -142,12 +152,13 @@ for line in VCF:
         
         ## Check if all genotypes are present
         PassGeno=False
-        if any('./.' not in AlternateGT and './.' not in HeterozygousGT and './.' not in ReferenceGT and './.' not in NotReferenceGT and './.' not in NotAlternateGT:
+        if any(i not in BadGT  for i in GT):
             PassGeno=True
         
         PassGene=False
         if SearchGene in INFOstring:
             PassGene=True
+        
         
         if PassGeno and PassGene:
             OutputList=linelist[0:5]+[GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,SegDup]+GT+[FILTER,INFOstring]+QualityString
