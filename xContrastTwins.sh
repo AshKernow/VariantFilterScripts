@@ -1,5 +1,5 @@
 #!/bin/bash
-#$ -cwd -l mem=1G,time=:30: -N FilterTrio
+#$ -cwd -l mem=1G,time=:30: -N FilterTwin
 
 #hpc workarounds
 if [[ /bin/hostname==*.hpc ]]; then 
@@ -8,13 +8,16 @@ source /ifs/home/c2b2/af_lab/ads2202/.bash_profile
 fi
 
 #get arguments
-while getopts v:a:b:u:o:: opt; do
+while getopts v:t:n:p:f:a:b:u: opt; do
     case "$opt" in
         v) VcfFil="$OPTARG";;
+        t) TwnTab="$OPTARG";;
+        n) DirPre="$OPTARG";;
+        p) AddPrm="$OPTARG";;
+        f) FamNam="$OPTARG";;
         a) Twin1="$OPTARG";;
         b) Twin2="$OPTARG";;
         u) Unfiltered="$OPTARG";;
-        o) OutFil="$OPTARG";;
         #H) echo "$usage"; exit;;
     esac
 done
@@ -23,39 +26,68 @@ FiltScrDir="/ifs/scratch/c2b2/af_lab/ads2202/Exome_Seq/scripts/Filtering_scripts
 
 VcfFil=`readlink -f $VcfFil`
 
-PyCall="/ifs/scratch/c2b2/af_lab/ads2202/Exome_Seq/scripts/Filtering_scripts/ExmFilt.CustomGenotype.py -v $VcfFil -o $OutFil.temp -f 0.01 -p " 
+if [[ $TwnTab ]]; then
+    FamNam=`cut -f 1 $TwnTab | head -n $SGE_TASK_ID | tail -n 1`
+    Twin1=`cut -f 2 $TwnTab | head -n $SGE_TASK_ID | tail -n 1`
+    Twin2=`cut -f 3 $TwnTab | head -n $SGE_TASK_ID | tail -n 1`
+    Unfiltered=`cut -f 4 $TwnTab | head -n $SGE_TASK_ID | tail -n 1`
+fi
+
+if [[ $FamNam == [0-9]* ]]; then FamNam=Fam$FamNam; fi
+OutFil=$FamNam.ContrastTwins
+
+DirNam=$FamNam.Twins
+if [[ $DirPre ]]; then DirNam=$DirPre"_"$DirNam; fi
+mkdir -p $DirNam
+cd $DirNam
 
 runCustomFilter(){
 if [[ $Unfiltered ]]; then TwinComp=$TwinComp" --unfl $Unfiltered"; fi
-CMD="$PyCall $TwinComp"
+if [[ $AddPrm ]]; then TwinComp=$TwinComp" $AddPrm"; fi
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil $TwinComp"
 echo $CMD
 eval $CMD
-nlines=$(cat $OutFil.temp.tsv | wc -l)
-nlines=$(( $nlines - 1 ))
-echo "Filtered $nlines variants"
 }
 
-TwinComp=" --het $Twin1 --ref $Twin2"
+TwinComp=" -o $OutFil.t1.temp --het $Twin1 --ref $Twin2"
 runCustomFilter
-cat $OutFil.temp.tsv >> $OutFil.tsv
 
-TwinComp=" --het $Twin1 --alt $Twin2"
+TwinComp=" -o $OutFil.t2.temp --het $Twin1 --alt $Twin2"
 runCustomFilter
-cat $OutFil.temp.tsv | awk '{ out=$1; for(i=2;i<=15;i++){out=out"\t"$i}; out=out"\t"$17"\t"$16"\t"$18; print out}' >> $OutFil.tsv
 
-TwinComp=" --ref $Twin1 --het $Twin2"
+TwinComp=" -o $OutFil.t3.temp --ref $Twin1 --het $Twin2"
 runCustomFilter
-cat $OutFil.temp.tsv | awk '{ out=$1; for(i=2;i<=15;i++){out=out"\t"$i}; out=out"\t"$17"\t"$16"\t"$18; print out}' >> $OutFil.tsv
 
-TwinComp=" --ref $Twin1 --alt $Twin2"
+TwinComp=" -o $OutFil.t4.temp --ref $Twin1 --alt $Twin2"
 runCustomFilter
-cat $OutFil.temp.tsv | awk '{ out=$1; for(i=2;i<=15;i++){out=out"\t"$i}; out=out"\t"$17"\t"$16"\t"$18; print out}'  >> $OutFil.tsv
 
-TwinComp=" --alt $Twin1 --ref $Twin2"
+TwinComp=" -o $OutFil.t5.temp --alt $Twin1 --ref $Twin2"
 runCustomFilter
-cat $OutFil.temp.tsv >> $OutFil.tsv
 
-TwinComp=" --alt $Twin1 --het $Twin2"
+TwinComp=" -o $OutFil.t6.temp --alt $Twin1 --het $Twin2"
 runCustomFilter
-cat $OutFil.temp.tsv >> $OutFil.tsv
-rm $OutFil.temp*
+
+R --vanilla <<RSCRIPT
+options(stringsAsFactors=F)
+dat <- read.delim("$OutFil.t1.temp.tsv")
+for(i in 2:6){
+    temp <- read.delim(paste("$OutFil.t", i, ".temp.tsv", sep=""))
+    temp <- temp[,match(colnames(temp), colnames(dat))]
+    dat <- rbind(dat, temp)
+    }
+write.table(dat, "$OutFil.tsv", row.names=F, quote=F, sep="\t")
+RSCRIPT
+
+echo "Six contrasts performed on paired samples. Logs for each contrast:" > $OutFil.filtered.log
+echo >> $OutFil.filtered.log
+echo "-------------------------------------------------------------------------------------------------------------" >> $OutFil.filtered.log
+echo >> $OutFil.filtered.log
+
+for i in $OutFil.t*.temp.log; do 
+ grep -vE  "OutputName|Not" $i >> $OutFil.log
+ echo >> $OutFil.filtered.log
+ echo "-------------------------------------------------------------------------------------------------------------" >> $OutFil.filtered.log
+ echo >> $OutFil.filtered.log
+done
+
+rm -f $OutFil.*temp*
