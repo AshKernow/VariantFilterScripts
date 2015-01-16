@@ -30,3 +30,23 @@ comphet <- rbind(mathet, pathet)
 comphet <- comphet[order(comphet[,"Chromosome"], comphet[,"Position"]),]
 write.table(comphet, "$OutNam.compound_heterozygous.tsv", col.names=T, row.names=F, quote=F, sep="\t")
 RSCRIPT
+
+echo "Paternal Filtering" > $OutNam.compound_heterozygous.log
+echo "---------------------------------------------------" >> $OutNam.compound_heterozygous.log
+cat ${PatHet/tsv/log} >> $OutNam.compound_heterozygous.log
+echo "" >> $OutNam.compound_heterozygous.log
+echo "===================================================" >> $OutNam.compound_heterozygous.log
+echo "" >> $OutNam.compound_heterozygous.log
+
+echo "Maternal Filtering" >> $OutNam.compound_heterozygous.log
+echo "---------------------------------------------------" >> $OutNam.compound_heterozygous.log
+cat ${MatHet/tsv/log} >> $OutNam.compound_heterozygous.log
+echo "" >> $OutNam.compound_heterozygous.log
+echo "===================================================" >> $OutNam.compound_heterozygous.log
+echo "" >> $OutNam.compound_heterozygous.log
+OvLen=`cut -f 6  $OutNam.compound_heterozygous.tsv |  sort | uniq | wc -l`
+OvLen=$(( OvLen - 1 ))
+echo "Number of genes with possible compound heterozyogus variants: $OvLen" >> $OutNam.compound_heterozygous.log
+OvLen=`cat $OutNam.compound_heterozygous.tsv | wc -l`
+OvLen=$(( OvLen - 1 ))
+echo "Number of variants: $OvLen" >> $OutNam.compound_heterozygous.log
