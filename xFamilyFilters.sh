@@ -8,11 +8,12 @@ source /ifs/home/c2b2/af_lab/ads2202/.bash_profile
 fi
 
 #get arguments
-while getopts v:t:n: opt; do
+while getopts v:t:n:p: opt; do
     case "$opt" in
         v) VcfFil="$OPTARG";;
         t) FamFil="$OPTARG";;
         n) DirPre="$OPTARG";;
+        p) AddPrm="$OPTARG";;
         #H) echo "$usage"; exit;;
     esac
 done
@@ -33,11 +34,32 @@ if [[ -n $DirPre ]]; then DirNam=$DirPre"_"$DirNam; fi
 mkdir -p $DirNam
 cd $DirNam
 
+#check for X-linked and add flag if necessary
 if [[ $ModNam == *X* ]]; then FilPrm=$FilPrm" -X"; fi
+#check for de novo and add flag if necessary
 if [[ $ModNam == *ovo* ]]; then FilPrm=$FilPrm" -D"; fi
 
 echo "Filtering.."
 CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.$ModNam $FilPrm"
+if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
+
+#check for Individual compound heterozygous and 
+if [[ "$ModNam" == *IcHet* ]]; then
+    TsvFil=$FamNam.$ModNam.tsv
+    LogFil=$FamNam.$ModNam.log
+    echo "----------------------------------------------------------------------" >> $LogFil
+    echo "Filtering for compound heterozygous..." >> $LogFil
+    R --vanilla <<RSCRIPT
+        dat <- read.delim("$TsvFil")
+        dat <- dat[gsub(",.*", "", dat[,6])%in%gsub(",.*", "", dat[duplicated(dat[,6]),6]),]
+        dat <- dat[dat[,6]!=".",]
+        write.table(dat, "$TsvFil", col.names=T, row.names=F, sep="\t", quote=F)
+RSCRIPT
+    LEN=`cat $TsvFil | wc -l`
+    LEN=$(( LEN - 1 ))
+    GEN=`tail -n +2 $TsvFil | cut -f 6 | uniq | wc -l`
+    echo "After filtering $LEN variants remaining in $GEN genes" >> $LogFil
+fi
 
