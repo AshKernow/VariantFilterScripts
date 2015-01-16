@@ -8,11 +8,12 @@ source /ifs/home/c2b2/af_lab/ads2202/.bash_profile
 fi
 
 #get arguments
-while getopts v:t:n: opt; do
+while getopts v:t:n:p: opt; do
     case "$opt" in
         v) VcfFil="$OPTARG";;
         t) PartFil="$OPTARG";;
         n) DirPre="$OPTARG";;
+        p) AddPrm="$OPTARG";;
         #H) echo "$usage"; exit;;
     esac
 done
@@ -30,7 +31,7 @@ Parent=`cut -f 3 $PartFil | head -n $SGE_TASK_ID | tail -n 1`
 echo $FamNam
 if [[ $FamNam == [0-9]* ]]; then FamNam=Fam$FamNam; fi
 
-DirNam=$FamNam.Trio
+DirNam=$FamNam.Fam
 if [[ -n $DirPre ]]; then DirNam=$DirPre"_"$DirNam; fi
 mkdir -p $DirNam
 cd $DirNam
@@ -38,19 +39,23 @@ cd $DirNam
 #Autosomal Recessive
 echo "Autosomal Recessive.."
 CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.AR --alt $Proband --het $Parent"
+if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
 #Autosomal Dominant
 echo "Autosomal Dominant.."
 CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.AD  --het $Proband --ref $Parent"
+if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
 #compound heterozygous
 echo "Compund heterozygous.."
 CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.tempheppat  --het $Proband,$Parent"
+if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
 CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.temphepmat  --het $Proband --ref $Parent"
+if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
 R --vanilla <<RSCRIPT
