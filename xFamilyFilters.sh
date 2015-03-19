@@ -23,13 +23,20 @@ FiltScrDir="/ifs/scratch/c2b2/af_lab/ads2202/Exome_Seq/scripts/Filtering_scripts
 VcfFil=`readlink -f $VcfFil`
 FamFil=`readlink -f $FamFil`
 
-FamNam=`cut -f 1 $FamFil | head -n $SGE_TASK_ID | tail -n 1`
-ModNam=`cut -f 2 $FamFil | head -n $SGE_TASK_ID | tail -n 1`
-FilPrm=`cut -f 3 $FamFil | head -n $SGE_TASK_ID | tail -n 1`
+
+if [[ "$SGE_TASK_ID" != "undefined" ]]; then
+        ArrNum=$SGE_TASK_ID
+else
+        ArrNum=1
+fi
+
+FamNam=`cut -f 1 $FamFil | head -n $ArrNum | tail -n 1`
+ModNam=`cut -f 2 $FamFil | head -n $ArrNum | tail -n 1`
+FilPrm=`cut -f 3 $FamFil | head -n $ArrNum | tail -n 1`
 
 if [[ $FamNam == [0-9]* ]]; then FamNam=Fam$FamNam; fi
 
-DirNam=$FamNam.Fam
+DirNam=$FamNam
 if [[ -n $DirPre ]]; then DirNam=$DirPre"_"$DirNam; fi
 mkdir -p $DirNam
 cd $DirNam
@@ -62,4 +69,7 @@ RSCRIPT
     GEN=`tail -n +2 $TsvFil | cut -f 6 | uniq | wc -l`
     echo "After filtering $LEN variants remaining in $GEN genes" >> $LogFil
 fi
-
+LEN=`cat $FamNam.$ModNam.tsv | wc -l`
+if [[ $LEN -gt 1 ]]; then
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.$ModNam.tsv
+fi

@@ -28,7 +28,7 @@ FamNam=`cut -f 1 $SingFil | head -n $SGE_TASK_ID | tail -n 1`
 
 if [[ $FamNam == [0-9]* ]]; then FamNam=Fam$FamNam; fi
 
-DirNam=$FamNam.Sgtn
+DirNam=$FamNam
 if [[ -n $DirPre ]]; then DirNam=$DirPre"_"$DirNam; fi
 mkdir -p $DirNam
 cd $DirNam
@@ -39,6 +39,10 @@ CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $Proband.AR --alt $Prob
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
+LEN=`cat $Proband.AR.tsv | wc -l`
+if [[ $LEN -gt 1 ]]; then
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $Proband.AR.tsv
+fi
 
 #Autosomal Dominant
 echo "Autosomal Dominant.."
@@ -46,6 +50,10 @@ CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $Proband.AD  --het $Pro
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
+LEN=`cat $Proband.AD.tsv | wc -l`
+if [[ $LEN -gt 1 ]]; then
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $Proband.AD.tsv
+fi
 R --vanilla <<RSCRIPT
 options(stringsAsFactors=F)
 
@@ -57,3 +65,7 @@ comphet <- het[het[,"Gene"]%in%gens,]
 
 write.table(comphet, "$Proband.compound_heterozygous.tsv", col.names=T, row.names=F, quote=F, sep="\t")
 RSCRIPT
+LEN=`cat $Proband.compound_heterozygous.tsv | wc -l`
+if [[ $LEN -gt 1 ]]; then
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $Proband.compound_heterozygous.tsv
+fi

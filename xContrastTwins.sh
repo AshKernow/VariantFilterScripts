@@ -36,7 +36,7 @@ fi
 if [[ $FamNam == [0-9]* ]]; then FamNam=Fam$FamNam; fi
 OutFil=$FamNam.ContrastTwins
 
-DirNam=$FamNam.Twins
+DirNam=$FamNam
 if [[ $DirPre ]]; then DirNam=$DirPre"_"$DirNam; fi
 mkdir -p $DirNam
 cd $DirNam
@@ -77,6 +77,12 @@ for(i in 2:6){
     }
 write.table(dat, "$OutFil.tsv", row.names=F, quote=F, sep="\t")
 RSCRIPT
+
+LEN=`cat $OutFil.tsv | wc -l`
+if [[ $LEN -gt 1 ]]; then
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $OutFil.tsv
+fi
+
 
 echo "Six contrasts performed on paired samples. Logs for each contrast:" > $OutFil.filtered.log
 echo >> $OutFil.filtered.log
