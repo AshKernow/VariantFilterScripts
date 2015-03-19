@@ -51,11 +51,22 @@ VCF=open(options.VCFfile,'r')
 BaseName=str(options.OutputFileName)
 TabOutputFilename=BaseName+'.tsv'
 Output=open(TabOutputFilename,'w')
+LogOutputFilename=BaseName+'.log'
+Outlog=open(LogOutputFilename,'w')
+
+##write log file
+import datetime
+TimeNow=str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+Outlog.write("Tabulate VCF: "+TimeNow+"\n")
+Outlog.write("VCF: "+str(options.VCFfile)+"\n")
+Outlog.write("OutputName: "+str(options.OutputFileName)+"\n")
+Outlog.write("\n")
 
 ################################################################################################################
 ##### START FILTERING                                                                                        ###
 ################################################################################################################
 
+OrigCount=0
 for line in VCF:
     if  line.startswith('#CHROM'):
         ################################################################################################################
@@ -63,23 +74,27 @@ for line in VCF:
         ################################################################################################################
         linelist=line.split("\t", 9)
         SampleList=linelist[9].strip()
+        AllSamplesList=SampleList.split("\t")
         ##Start output tables
-        headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','AlleleFrequency.VCF','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','SegmentalDuplication','PredictionSummary','VariantCallQuality','QUAL','MQ0','DP','FILTER',SampleList,'INFO']
+        headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','AlleleFrequency.VCF','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','MetaSVMprediction','SegmentalDuplication','PredictionSummary','VariantCallQuality','QUAL','MQ0','DP','FILTER']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+['AlternateAlleles', 'INFO']
         Output.write("\t".join(headerlist)+"\n")
     if '#' not in line:
         ################################################################################################################
         ##### PARSE LINE AND GET VARIANT INFO                                                                        ###
         ################################################################################################################
         
-        linelist=line.split("\t",9)
+        linelist=line.split("\t")
+        OrigCount=OrigCount+1
         
         ##Get Alternate Alleles
         AltAllsStr=linelist[4]
-        AltAlls=AltAllsStr.split(",",9)
+        AltAlls=AltAllsStr.split(",")
         AltNum=len(AltAlls)
         
         QUAL=float(linelist[5])
         VariantFilter=linelist[6]
+        FORMAT=linelist[8]
+        FORMAT=FORMAT.split(":")
         
         ## Get variant data from INFO Field
         INFOstring=linelist[7]
@@ -121,6 +136,9 @@ for line in VCF:
         GERPscoreList=GERPscoreList.split(',')
         CADDscoreList=str(INFOdict.get('CADDphred','.'))
         CADDscoreList=CADDscoreList.split(',')
+        MetaSVMpredictionList=INFOdict.get('MetaSVMprd','.')
+        MetaSVMpredictionList=MetaSVMpredictionList.split(',')
+        
         
         
         ################################################################################################################
@@ -160,6 +178,8 @@ for line in VCF:
             SIFTprediction=SIFTpredictionList[cltnum]
             cltnum=min(len(PP2predictionList)-1, altnum)
             PP2prediction=PP2predictionList[cltnum]
+            cltnum=min(len(MetaSVMpredictionList)-1, altnum)
+            MetaSVMprediction=MetaSVMpredictionList[cltnum]
             cltnum=min(len(CADDscoreList)-1, altnum)
             CADDscore=str(CADDscoreList[cltnum])
             if CADDscore == ".":
@@ -169,13 +189,15 @@ for line in VCF:
             
             #Set Patho level
             PathoLevel="Low"
-            if VariantClass in MissenseClass and SIFTprediction=="." and PP2prediction=="." and CADDscore==".":
+            if VariantClass in MissenseClass and SIFTprediction=="." and PP2prediction=="." and CADDscore=="." and MetaSVMprediction==".":
                 PathoLevel="Med"
             if VariantClass in MissenseClass and (SIFTprediction=="D" or PP2prediction=="D" or PP2prediction=="P" or CADDscoretest>=15):
                 PathoLevel="Med"
             if VariantClass in MissenseClass and (SIFTprediction=="D" and PP2prediction=="D"):
                 PathoLevel="High"
             if VariantClass in MissenseClass and (CADDscoretest>=25):
+                PathoLevel="High"
+            if VariantClass in MissenseClass and MetaSVMprediction=="D":
                 PathoLevel="High"
             if VariantFunction in SplicingClass:
                 PathoLevel="High"
@@ -188,6 +210,10 @@ for line in VCF:
                 FILTER='Medium'
             if VariantClass not in InDelClass and any( str(i) in VariantFilter for i in MidSnpFilters):
                 FILTER='Medium'
+            if VariantClass in InDelClass and any( str(i) in VariantFilter for i in BadInDFilters):
+                FILTER='Low'
+            if VariantClass not in InDelClass and any( str(i) in VariantFilter for i in BadSnpFilters):
+                FILTER='Low'
             
             ################################################################################################################
             ##### OUTPUTS                                                                                                ###
@@ -205,11 +231,20 @@ for line in VCF:
             ALT=str(AltAlls[altnum])
             cltnum=min(len(GERPscoreList)-1, altnum)
             GERPscore=str(GERPscoreList[cltnum])
-            SampleStrings=linelist[9].strip()
-            
-            #headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','AlleleFrequency.VCF','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','SegmentalDuplication','PredictionSummary','VariantCallQuality','QUAL','MQ0','DP','FILTER']+SampleList+['INFO']
-            OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,VCFFreq,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,SegDup,PathoLevel,FILTER,QUAL,MQ0number,DPnumber,VariantFilter,SampleStrings,INFOstring]
+            SampleStrings=linelist[9:]
+            SampleStrings=[ i.split(':') for i in SampleStrings ]
+            GTind=FORMAT.index('GT')
+            AllSampleGT=[ "'"+SampleStrings[i][GTind] for i in range(0,len(SampleStrings)) ]
+            if "AD" in FORMAT:
+            ## Define Allele Count
+                ADind=FORMAT.index('AD')
+                AllSampleAD=[ "'"+SampleStrings[i][ADind] for i in range(0,len(SampleStrings))]
+            #headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','AlleleFrequency.VCF','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','MetaSVMprediction','SegmentalDuplication','PredictionSummary','VariantCallQuality','QUAL','MQ0','DP','FILTER']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+['AlternateAlleles', 'INFO']
+            OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,VCFFreq,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,MetaSVMprediction,SegDup,PathoLevel,FILTER,QUAL,MQ0number,DPnumber,VariantFilter]+AllSampleGT+AllSampleAD+[AltAllsStr,INFOstring]
             OutputList= [ str(i) for i in OutputList ]
             OutputString="\t".join(OutputList)
             Output.write(OutputString+"\n")
             
+Outlog.write("\t Number of variants in original VCF: "+str(OrigCount)+"\n")
+Outlog.write("Tabulation Complete: "+TimeNow+"\n")
+print "Tabulation Complete "+TimeNow
