@@ -46,23 +46,33 @@ LEN=`cat $FamNam.AR.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
     qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.AR.tsv
 fi
-#Autosomal Dominant
+#Autosomal Dominant unaffected Parent
 echo "Autosomal Dominant.."
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.AD  --het $Proband --ref $Parent"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.unaffAD  --het $Proband --ref $Parent"
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
-LEN=`cat $FamNam.AD.tsv | wc -l`
+LEN=`cat $FamNam.unaffAD.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.AD.tsv
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.unaffAD.tsv
+fi
+#Autosomal Dominant affected Parent
+echo "Autosomal Dominant.."
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.affAD  --het $Proband,$Parent"
+if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
+echo $CMD
+eval $CMD
+LEN=`cat $FamNam.affAD.tsv | wc -l`
+if [[ $LEN -gt 1 ]]; then
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.affAD.tsv
 fi
 #compound heterozygous
 echo "Compund heterozygous.."
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.tempheppat  --het $Proband,$Parent"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.tempheppat  --het $Proband,$Parent -P  -f 0.03"
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.temphepmat  --het $Proband --ref $Parent"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.temphepmat  --het $Proband --ref $Parent -P  -f 0.03"
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
@@ -79,7 +89,7 @@ comphet <- rbind(mathet, pathet)
 comphet <- comphet[order(comphet[,"Chromosome"], comphet[,"Position"]),]
 write.table(comphet, "$FamNam.compound_heterozygous.tsv", col.names=T, row.names=F, quote=F, sep="\t")
 RSCRIPT
-cat $FamNam.tempheppat.log $FamNam.temphepmat.log > $FamNam.filter.compound_heterozygous.log
+cat $FamNam.tempheppat.log $FamNam.temphepmat.log > $FamNam.compound_heterozygous.log
 LEN=`cat $FamNam.compound_heterozygous.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
     qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.compound_heterozygous.tsv
