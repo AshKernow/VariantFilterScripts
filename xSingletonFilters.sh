@@ -54,10 +54,17 @@ LEN=`cat $Proband.AD.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
     qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $Proband.AD.tsv
 fi
+
+#Autosomal Dominant
+echo "Autosomal Dominant.."
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $Proband.tempcHet  --het $Proband -P  -f 0.03"
+if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
+echo $CMD
+eval $CMD
 R --vanilla <<RSCRIPT
 options(stringsAsFactors=F)
 
-het <- read.delim("$Proband.AD.tsv")
+het <- read.delim("$Proband.tempcHet.tsv")
 
 gens <- unique(het[duplicated(het[,"Gene"]),"Gene"])
 
@@ -69,3 +76,4 @@ LEN=`cat $Proband.compound_heterozygous.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
     qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $Proband.compound_heterozygous.tsv
 fi
+rm *tempcHet*
