@@ -6,19 +6,6 @@
 ################################################################################################################
 #### The purpose of this script is to filter a VCF file for variants based on user-specified genotypes for each sample.
 #### For example: To filter according to an autosomal dominant inheritance model, filter all mutations that are homozygous reference (0/0) in one parent and heterozygous (0/1) in the other parent and the proband.
-####    -v/--vcf    <required>    The script requires an input vcf
-####    -o/--out    <required>    The use should specify a base name for the output files.The script outputs the filtered results as both a tab delimited file and a vcf file. The script also produces a log file and an auxilary file that contains the results of every test of every variant as "TRUE" or "FALSE" (primarily for debugging purposes).
-####    -a/--alt ...
-####    -e/--het ...
-####    -r/--ref ... <required>    For each genotype - homozygous alternate, heterozygous, homozygous reference, the user must supply the sample ids as in the vcf for each genotype. If there is more than one sample per a genotype they should be separated by a comma.
-####    -x/--xalt not homozygous alternate
-####    -n/--xref not homozygous reference   
-####    -u/--unfl not filtered just output genotype data
-####    -d/--dp    <optional>    The user may optionally specify a minimum depth of coverage for each individual
-####    -g/--gq    <optional>    The user may optionally specify a minimum genotyping quality for each individual
-####    -m/--mq    <optional>    The user may optionally specify a maximum for the ratio of MQ0/DP for each variant
-####    -f/--maf    <optional>    The user may optionally specify a maximum alternate allele frequency for each variant - compared to both 1KG and ESP-GO
-####
 #### It is not necessary to specify all of the samples in the vcf, if only a subset is supplied only that subset will be used for filtering and output to the tab delimited file; the output vcf will contain all samples. If no samples are specified then all variants will be returned
 #### If a variant has multiple alternate alleles then the script will, with some limitations, iterate across possible combinations of these for heterozygous and homozygous alternate. Limitations:
 ####            The homozygous alternate allele will be the same for all individuals (i.e. if two individual are 2/2 and 3/3, this will not be kept)
@@ -54,19 +41,25 @@ parser.add_option("-u", "--unfl", dest="notfiltered",help="Samples that should n
 ## Additional Parameters to Adjust filtering thresholds
 parser.set_defaults(MQ0threshold="0.05")
 parser.set_defaults(DPthreshold="3")
-parser.set_defaults(MAFthreshold="0.01")
-parser.set_defaults(GQthreshold="30")
+parser.set_defaults(ExACthreshold="0.01")
+parser.set_defaults(OneKGthreshold="0.01")
+parser.set_defaults(AllMAF="2")
+parser.set_defaults(ESPthreshold="0.01")
 parser.set_defaults(CHTthreshold="0.05")
+parser.set_defaults(GQthreshold="30")
 parser.set_defaults(HetAllCountthreshold="3")
 parser.set_defaults(HomAllFracthreshold="0.7")
 
-#### - unused options: b        k l    p q  s t   w  y z 
+#### - unused options: b       l    p q  t   w  z 
 
 parser.add_option("-d", "--dp", dest="DPthreshold",help="minimum depth of coverage", metavar="DPthreshold")
 parser.add_option("-m", "--mq", dest="MQ0threshold",help="maximum for MQ value, given as a decimal fraction (e.g. 0.05 = 5% of reads for a variant can have MQ0) - fraction of reads with quality 0", metavar="MQ0")
-parser.add_option("-f", "--maf", dest="MAFthreshold",help="maximum MAF", metavar="MAFthreshold")
-parser.add_option("-g", "--gq", dest="GQthreshold",help="minimum for GQ value", metavar="GQthreshold")
+parser.add_option("-f", "--maf", dest="AllMAF",help="set all Maximum MAF filters to this value", metavar="AllMAF")
+parser.add_option("-y", "--exac", dest="ExACthreshold",help="maximum MAF in Exome Aggregation Consortium database", metavar="ExACthreshold")
+parser.add_option("-k", "--okg", dest="OneKGthreshold",help="maximum MAF in One Thousand Genomes database", metavar="OneKGthreshold")
+parser.add_option("-s", "--esp", dest="ESPthreshold",help="maximum MAF in ESP-GO database", metavar="ESPthreshold")
 parser.add_option("-c", "--cht", dest="CHTthreshold",help="maximum frequency of allele in cohort of samples in the vcf", metavar="CHTthreshold")
+parser.add_option("-g", "--gq", dest="GQthreshold",help="minimum for GQ value", metavar="GQthreshold")
 parser.add_option("-i", "--aac", dest="HetAllCountthreshold",help="minimum alternate allele count in heterozygous calls", metavar="HetAllCountthreshold")
 parser.add_option("-j", "--haf", dest="HomAllFracthreshold",help="Fraction of allele counts for homozygous allele", metavar="HomAllFracthreshold")
 
@@ -75,9 +68,10 @@ parser.add_option("-Q", "--noqual", action='store_true', dest="noqual", help="Do
 
 parser.add_option("-X", "--xlinked", action='store_true', dest="xlink", help="Only output X chromosome")
 parser.add_option("-D", "--denovo", action='store_true', dest="denovo", help="Use higher stringency filters for de novo")
+parser.add_option("-V", "--vcfout", action='store_true', dest="vcfout", help="Output the selected variants in vcf format")
 
 
-parser.add_option("-z", "--debug", action='store_true', dest="debug", help="Output a boolean decision file for debugging purposes")
+parser.add_option("-Z", "--debug", action='store_true', dest="debug", help="Output a boolean decision file for debugging purposes")
 
 (options, args) = parser.parse_args()
 
@@ -88,20 +82,20 @@ parser.add_option("-z", "--debug", action='store_true', dest="debug", help="Outp
 ##Assign input and output files
 VCF=open(options.VCFfile,'r')
 BaseName=str(options.OutputFileName)
+DeNovo=options.denovo
+OutputVcf=options.vcfout
+DeBug=options.debug
+NoPatho=options.nopatho
+NoQualityFilter=options.noqual
+XLink=options.xlink
 TabOutputFilename=BaseName+'.tsv'
 VcfOutputFilename=BaseName+'.vcf'
 LogOutputFilename=BaseName+'.log'
 PassOutputFilename=BaseName+'.boolean.log'
 Output=open(TabOutputFilename,'w')
-Outvcf=open(VcfOutputFilename,'w')
 Outlog=open(LogOutputFilename,'w')
-XLink=options.xlink
-DeNovo=options.denovo
-DeBug=options.debug
-NoPatho=options.nopatho
-NoQualityFilter=options.noqual
-if DeBug:
-    OutPass=open(PassOutputFilename,'w')
+if OutputVcf: Outvcf=open(VcfOutputFilename,'w')
+if DeBug: OutPass=open(PassOutputFilename,'w')
 
 ################################################################################################################
 ##### ASSIGN FILTER VARIABLES                                                                                ###
@@ -109,25 +103,34 @@ if DeBug:
 
 ## Variant Quality Filter
 
-BadSnpFilters=['QD_Bad_SNP','FS_Bad_SNP','FS_Mid_SNP;QD_Mid_SNP']
-BadInDFilters=['LowQD_Indel']
+BadSnpFilters=['QD_Bad_SNP','FS_Bad_SNP','FS_Mid_SNP;QD_Mid_SNP','LowQuality']
+BadInDFilters=['LowQD_Indel','LowQuality']
 MidSnpFilters=['FS_Mid_SNP','QD_Mid_SNP','VQSRTrancheSNP99.00to99.90','VQSRTrancheSNP99.90to100.00']
 MidInDFilters=['FSBias_Indel','RPBias_Indel','VQSRTrancheINDEL99.00to99.90','VQSRTrancheINDEL99.90to100.00']
 
 HetAllCountFilter=int(options.HetAllCountthreshold)
 HomAllFrac=float(options.HomAllFracthreshold)
 MQ0filter=float(options.MQ0threshold)
-MAFfilter=float(options.MAFthreshold)
+AllMAFfilters=float(options.AllMAF)
+ExACfilter=float(options.ExACthreshold)
+OneKGfilter=float(options.OneKGthreshold)
+ESPfilter=float(options.ESPthreshold)
 DPfilter=int(options.DPthreshold)
 GQfilter=int(options.GQthreshold)
 CHTfilter=float(options.CHTthreshold)
 QualFilter=30
+if AllMAFfilters != 2:
+    ExACfilter=AllMAFfilters
+    OneKGfilter=AllMAFfilters
+    ESPfilter=AllMAFfilters
 
 ## Change filters if de novo required
 if DeNovo:
     HetAllCountFilter=6
     HomAllFrac=0.98
-    MAFfilter=0.001
+    ExACfilter= ExACfilter / 10
+    OneKGfilter= OneKGfilter / 10
+    ESPfilter= ESPfilter / 10
     CHTfilter=0.01
     DPfilter=5
 
@@ -188,7 +191,7 @@ Outlog.write("\n")
 
 ##Start output tables
 AllSamplesList=AlternateSampleList+HeterozygousSampleList+ReferenceSampleList+NotReferenceSampleList+NotAlternateSampleList+NotFilteredSampleList
-headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','MetaSVM','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','SegmentalDuplication','PredictionSummary','VariantCallQuality']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+['AlternateAlleles', 'FILTER', 'INFO']+AllSamplesList
+headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','MetaSVM','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','SegmentalDuplication','PredictionSummary','VariantCallQuality']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+['AlternateAlleles', 'MetaSVMScore','FILTER', 'INFO']+AllSamplesList
 Output.write("\t".join(headerlist)+"\n")
 if DeBug:
     debugheaderlist=['Chromosome','Position','REF','ALT','AAlt','PassExAC','PassKG','PassESP','PassVCF','PassQUAL','PassMQ','PassFunction','PassClass','PassGT','PassDP','PassGQ','PassPatho','PassFilter','PassAFC']
@@ -212,8 +215,7 @@ SplicingCount=[0,0]
 UnknownCount=[0,0]
 
 for line in VCF:
-    if '#' in line:
-        Outvcf.write(line)
+    if '#' in line and OutputVcf: Outvcf.write(line)
     if  line.startswith('#CHROM'):
     ################################################################################################################
     ##### MAP COLUMN NAME TO NUMBER AND THEN LIST COLUMN NUMBERS CORRESPONDING TO EACH SAMPLE                    ###
@@ -303,7 +305,9 @@ for line in VCF:
         GERPscoreList=str(INFOdict.get('GERP','.'))
         GERPscoreList=GERPscoreList.split(',')
         CADDscoreList=str(INFOdict.get('CADDphred','.'))
-        CADDscoreList=CADDscoreList.split(',')        
+        CADDscoreList=CADDscoreList.split(',')
+        SVMscoreList=INFOdict.get('MetaSVMscr','.')
+        SVMscoreList=SVMscoreList.split(',')
         SVMpredictionList=INFOdict.get('MetaSVMprd','.')
         SVMpredictionList=SVMpredictionList.split(',')
         
@@ -376,13 +380,13 @@ for line in VCF:
             PassGeno=True
         
         if PassGeno and PassFunction and PassMQ and PassQUAL:
-            
-            
             ################################################################################################################
             ##### SAMPLES - DP and GQ                                                                                    ###
             ################################################################################################################
 
+            PassDP=True
             if "DP" in FORMAT:
+                PassDP=False
                 ## Define DP
                 DPind=FORMAT.index('DP')
                 AlternateDP=[ str(AlternateQualityList[i][DPind]) for i in range(0,len(AlternateQualityString)) ]
@@ -411,11 +415,12 @@ for line in VCF:
                         NotAlternateDP[i]="0"
                     NotAlternateDP[i]=float(NotAlternateDP[i])
                 ## Check to see if Depth passes
-                PassDP=False
                 if all(i >= DPfilter for i in AlternateDP) and all(i >= DPfilter for i in HeterozygousDP) and all(i >= DPfilter for i in ReferenceDP):
                     PassDP=True
             
+            PassGQ=True
             if "GQ" in FORMAT:
+                PassGQ=False
                 ## Define GQ
                 GQind=FORMAT.index('GQ')
                 AlternateGQ=[ float(AlternateQualityList[i][GQind]) for i in range(0,len(AlternateQualityString)) ]
@@ -424,7 +429,6 @@ for line in VCF:
                 NotReferenceGQ=[ float(NotReferenceQualityList[i][GQind]) for i in range(0,len(NotReferenceQualityString)) ]
                 NotAlternateGQ=[ float(NotAlternateQualityList[i][GQind]) for i in range(0,len(NotAlternateQualityString)) ]
                 ## Check to see if genotype quality passes
-                PassGQ=False
                 if all(i >= GQfilter for i in AlternateGQ) and all(i >= GQfilter for i in HeterozygousGQ) and all(i >= GQfilter for i in ReferenceGQ):
                     PassGQ=True
             
@@ -450,7 +454,10 @@ for line in VCF:
                 ##### PER SAMPLE ALTERNATE ALLELE COUNTS/FRACTIONS                                                           ###
                 ################################################################################################################
                 
+                PassAFC=True
+                AllSampleAD=[ "NA" for i in AllSampleGT] 
                 if "AD" in FORMAT:
+                    PassAFC=False
                     ## Define Allele Count
                     ADind=FORMAT.index('AD')
                     
@@ -492,7 +499,6 @@ for line in VCF:
                     AllSampleAD=AllSampleAD+NotFilteredAC
                     
                     ##Check alternate allele counts and fractions
-                    PassAFC=False
                     if all( i >= HetAllCountFilter for i in HeterozygousAC) and all( i >= HomAllFrac for i in AlternateAAF) and all( i >= HomAllFrac for i in ReferenceAAF):
                         PassAFC=True
                     
@@ -515,7 +521,7 @@ for line in VCF:
                     KGFreqtest=float(0)
                 else:
                     KGFreqtest=float(KGFreq)
-                if KGFreqtest <= MAFfilter:
+                if KGFreqtest <= OneKGfilter:
                     PassKG=True
                 
                 ## Check if ESP passes threshold
@@ -526,7 +532,7 @@ for line in VCF:
                     ESPFreqtest=float(0)
                 else:
                     ESPFreqtest=float(ESPFreq)
-                if ESPFreqtest <= MAFfilter:
+                if ESPFreqtest <= ESPfilter:
                     PassESP=True
                     
                 ## Check if ExAC passes threshold
@@ -537,7 +543,7 @@ for line in VCF:
                     ExACFreqtest=float(0)
                 else:
                     ExACFreqtest=float(ExACFreq)
-                if ExACFreqtest <= MAFfilter:
+                if ExACFreqtest <= ExACfilter:
                     PassExAC=True
                 
                 ## Check if VCF passes threshold
@@ -627,15 +633,17 @@ for line in VCF:
                     MAprediction=MApredictionList[cltnum]
                     cltnum=min(len(MTpredictionList)-1, altnum)
                     MTprediction=MTpredictionList[cltnum]
+                    cltnum=min(len(SVMscoreList)-1, altnum)
+                    SVMscore=SVMscoreList[cltnum]                    
                     ##output
                     ALT=str(AltAlls[altnum])
                     cltnum=min(len(GERPscoreList)-1, altnum)
                     GERPscore=str(GERPscoreList[cltnum])
-                    OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,SVMprediction,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,SegDup,PathoLevel,FILTER]+AllSampleGT+AllSampleAD+[AltAllsStr,VariantFilter,INFOstring]+AlternateQualityString+HeterozygousQualityString+ReferenceQualityString+NotReferenceQualityString+NotAlternateQualityString+NotFilteredQualityString
+                    OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,SVMprediction,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,SegDup,PathoLevel,FILTER]+AllSampleGT+AllSampleAD+[AltAllsStr,SVMscore,VariantFilter,INFOstring]+AlternateQualityString+HeterozygousQualityString+ReferenceQualityString+NotReferenceQualityString+NotAlternateQualityString+NotFilteredQualityString
                     OutputList= [ str(i) for i in OutputList ]
                     OutputString="\t".join(OutputList)
                     Output.write(OutputString+"\n")
-                    Outvcf.write(line)
+                    if OutputVcf: Outvcf.write(line)
                     
                     ################################################################################################################
                     ##### ADD TO VARIANT COUNTERS                                                                                  ###
@@ -671,9 +679,9 @@ if not NoQualityFilter:
     Outlog.write("\t MQ0/DP maximum: "+str(MQ0filter)+"\n")
 if NoQualityFilter:
     Outlog.write("\t No Variant Quality Filters\n")
-Outlog.write("\t 1000 genomes alternate allele frequency maximum: "+str(MAFfilter)+"\n")
-Outlog.write("\t GO ESP alternate allele frequency maximum: "+str(MAFfilter)+"\n")
-Outlog.write("\t ExAC alternate allele frequency maximum: "+str(MAFfilter)+"\n")
+Outlog.write("\t 1000 genomes alternate allele frequency maximum: "+str(OneKGfilter)+"\n")
+Outlog.write("\t GO ESP alternate allele frequency maximum: "+str(ESPfilter)+"\n")
+Outlog.write("\t ExAC alternate allele frequency maximum: "+str(ExACfilter)+"\n")
 Outlog.write("\t Within VCF allele frequency maximum: "+str(CHTfilter)+"\n")
 if NoPatho:
     Outlog.write("\t No Predicted Pathogenecity Filters")
