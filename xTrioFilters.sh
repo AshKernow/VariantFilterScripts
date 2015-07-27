@@ -108,12 +108,12 @@ fi
 
 #compound heterozygous
 echo "Compund heterozygous.."
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.tempheppat  --het $Proband,$Father --ref $Mother"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.tempheppat  --het $Proband,$Father --ref $Mother -P  -f 0.03"
 if [[ -n $Extras ]]; then CMD=$CMD" --unfl $Extras"; fi
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.temphepmat  --het $Proband,$Mother --ref $Father"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.temphepmat  --het $Proband,$Mother --ref $Father -P  -f 0.03"
 if [[ -n $Extras ]]; then CMD=$CMD" --unfl $Extras"; fi
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
@@ -131,7 +131,7 @@ comphet <- rbind(mathet, pathet)
 comphet <- comphet[order(comphet[,"Chromosome"], comphet[,"Position"]),]
 write.table(comphet, "$FamNam.compound_heterozygous.tsv", col.names=T, row.names=F, quote=F, sep="\t")
 RSCRIPT
-cat $FamNam.tempheppat.log $FamNam.temphepmat.log > $FamNam.filter.compound_heterozygous.log
+cat $FamNam.tempheppat.log $FamNam.temphepmat.log > $FamNam.compound_heterozygous.log
 LEN=`cat $FamNam.compound_heterozygous.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
     qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.compound_heterozygous.tsv
