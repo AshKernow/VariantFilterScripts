@@ -57,7 +57,7 @@ SearchGene=str(options.geneName)
 Samples=options.sampleIDs
 Sample=[]
 if Samples is not None:
-    Sample=Samples.upper().split(',')
+    Sample=Samples.split(',') #.upper().split(',')
 
 ################################################################################################################
 ##### INITIALISE OUTPUT FILES                                                                                ###
