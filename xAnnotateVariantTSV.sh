@@ -49,7 +49,7 @@ tail -n +2 $InpFil | cut -f 1-8 > $TempInp
 CMD1="convert2annovar.pl -includeinfo -format vcf4 $TempInp > $TempInp.2; mv -f $TempInp.2 $TempInp"
 
 #annotate the new file
-CMD2="table_annovar.pl $TempInp $AnnDir/humandb/ -buildver hg19 -remove -protocol clinvar_20140929 -operation f -nastring . -otherinfo -outfile $TempInp"
+CMD2="table_annovar.pl $TempInp $AnnDir/humandb/ -buildver hg19 -remove -protocol clinvar_20150330 -operation f -nastring . -otherinfo -outfile $TempInp"
 
 #Run commands
 echo "Start Annovar at `date`"
