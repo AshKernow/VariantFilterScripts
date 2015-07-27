@@ -51,7 +51,7 @@ if [[ "$MatNam" != "0" ]]; then
         PatPrm=$PatPrm" --ref "$MatNam
     fi
 fi
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.tempheppat $PatPrm"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.tempheppat $PatPrm -P -f 0.03"
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
@@ -68,7 +68,7 @@ if [[ "$PatNam" != "0" ]]; then
         MatPrm=$MatPrm" --ref "$PatNam
     fi
 fi
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.temphepmat $MatPrm"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.temphepmat $MatPrm -P -f 0.03"
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
@@ -89,5 +89,7 @@ cat $FamNam.tempheppat.log $FamNam.temphepmat.log > $FamNam.compound_heterozygou
 rm -rf *temphep*
 LEN=`cat $FamNam.compound_heterozygous.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.compound_heterozygous.tsv
+    CMD="qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.compound_heterozygous.tsv"
+    echo $CMD
+    eval $CMD
 fi
