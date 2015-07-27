@@ -76,13 +76,13 @@ for line in VCF:
         SampleList=linelist[9].strip()
         AllSamplesList=SampleList.split("\t")
         ##Start output tables
-        headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','AlleleFrequency.VCF','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','MetaSVMprediction','SegmentalDuplication','PredictionSummary','VariantCallQuality','QUAL','MQ0','DP','FILTER']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+['AlternateAlleles', 'INFO']
+        headerlist=['Chromosome','Position','ID','REF','ALT', 'AlleleNum', 'Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','AlleleFrequency.VCF','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','MetaSVMprediction','SegmentalDuplication','PredictionSummary','VariantCallQuality','QUAL','MQ0','DP','FILTER']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+[ i+" DP" for i in AllSamplesList]+[ i+" GQ" for i in AllSamplesList]+['AlternateAlleles', 'INFO']
         Output.write("\t".join(headerlist)+"\n")
     if '#' not in line:
         ################################################################################################################
         ##### PARSE LINE AND GET VARIANT INFO                                                                        ###
         ################################################################################################################
-        
+        line=line.strip()
         linelist=line.split("\t")
         OrigCount=OrigCount+1
         
@@ -234,13 +234,39 @@ for line in VCF:
             SampleStrings=linelist[9:]
             SampleStrings=[ i.split(':') for i in SampleStrings ]
             GTind=FORMAT.index('GT')
-            AllSampleGT=[ "'"+SampleStrings[i][GTind] for i in range(0,len(SampleStrings)) ]
+            AllSampleGT=[ "." for i in range(0,len(SampleStrings))]
+            for i in range(0,len(SampleStrings)):
+                AllSampleGT[i]=SampleStrings[i][GTind]
+            
             if "AD" in FORMAT:
             ## Define Allele Count
                 ADind=FORMAT.index('AD')
-                AllSampleAD=[ "'"+SampleStrings[i][ADind] for i in range(0,len(SampleStrings))]
+                AllSampleAD=[ "." for i in range(0,len(SampleStrings))]
+                for i in range(0,len(SampleStrings)):
+                    if AllSampleGT[i]!="./.":
+                        AllSampleAD[i]=SampleStrings[i][ADind]
+            
+            if "GQ" in FORMAT:
+            ## Define Allele Count
+                GQind=FORMAT.index('GQ')
+                AllSampleGQ=[ "." for i in range(0,len(SampleStrings))]
+                for i in range(0,len(SampleStrings)):
+                    if AllSampleGT[i]!="./.":
+                        print AllSampleGT[i]
+                        print SampleStrings[i]
+                        print i
+                        print linelist[0]+" "+linelist[1]
+                        AllSampleGQ[i]=SampleStrings[i][GQind]
+                        
+            if "DP" in FORMAT:
+            ## Define Allele Count
+                DPind=FORMAT.index('DP')
+                AllSampleDP=[ "." for i in range(0,len(SampleStrings))]
+                for i in range(0,len(SampleStrings)):
+                    if AllSampleGT[i]!="./.":
+                        AllSampleDP[i]=SampleStrings[i][DPind]
             #headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','AlleleFrequency.VCF','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','MetaSVMprediction','SegmentalDuplication','PredictionSummary','VariantCallQuality','QUAL','MQ0','DP','FILTER']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+['AlternateAlleles', 'INFO']
-            OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,VCFFreq,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,MetaSVMprediction,SegDup,PathoLevel,FILTER,QUAL,MQ0number,DPnumber,VariantFilter]+AllSampleGT+AllSampleAD+[AltAllsStr,INFOstring]
+            OutputList=linelist[0:4]+[ALT,altnum+1,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,VCFFreq,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,MetaSVMprediction,SegDup,PathoLevel,FILTER,QUAL,MQ0number,DPnumber,VariantFilter]+AllSampleGT+AllSampleAD+AllSampleDP+AllSampleGQ+[AltAllsStr,INFOstring]
             OutputList= [ str(i) for i in OutputList ]
             OutputString="\t".join(OutputList)
             Output.write(OutputString+"\n")
