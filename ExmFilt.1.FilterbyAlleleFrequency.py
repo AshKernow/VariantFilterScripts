@@ -79,31 +79,42 @@ for line in VCF:
                 INFOdict[FieldName]=FieldValue
         
         # Get values for later
-        KGscore=INFOdict.get('1KGfreq',0)
-        if type(KGscore) is str:
-            KGscore=KGscore.split(",")
-            KGscore=float(KGscore[0])
+        KGscore=str(INFOdict.get('1KGfreq',0))
+        KGscore=KGscore.split(",")
+        KGscore=KGscore[0]
+        if KGscore == ".":
+            KGscore=float(0)
+        else:
+            KGscore=float(KGscore)
+        
+        ESPscore=str(INFOdict.get('ESPfreq',0))
+        ESPscore=ESPscore.split(",")
+        ESPscore=ESPscore[0]
+        if ESPscore == ".":
+            ESPscore=float(0)
+        else:
+            ESPscore=float(ESPscore)
             
-        # Get withing cohort values for later
-        AFscore=INFOdict.get('AF',0)
-        if type(AFscore) is str:
-            AFscore=AFscore.split(",")
-            AFscore=float(AFscore[0])
+        ExACscore=str(INFOdict.get('ExACfreq',0))
+        ExACscore=ExACscore.split(",")
+        ExACscore=ExACscore[0]
+        if ExACscore == ".":
+            ExACscore=float(0)
+        else:
+            ExACscore=float(ExACscore)
         
-        ESPscore=INFOdict.get('ESPfreq',0)
-        if type(ESPscore) is str:
-            ESPscore=ESPscore.split(",")
-            ESPscore=float(ESPscore[0])
-        
+        AFscore=str(INFOdict.get('AF',0))
+        AFscore=AFscore.split(",")
+        AFscore=float(AFscore[0])
         
         # Check if KG passes threshold
         PassMAF=True
-        #First if less than/equal to (default)
-        if ( float(KGscore) < MafCutOff or float(ESPscore) < MafCutOff ) and GreaterThan:
+        #First if greater than/equal to (default)
+        if float(KGscore) < MafCutOff and float(ESPscore) < MafCutOff and float(ExACscore) < MafCutOff and GreaterThan:
             PassMAF=False
         
         #First if less than/equal to (default)
-        if ( float(KGscore) > MafCutOff or float(ESPscore) > MafCutOff ) and not GreaterThan:
+        if ( float(KGscore) > MafCutOff or float(ESPscore) > MafCutOff or float(ExACscore) > MafCutOff ) and not GreaterThan:
             PassMAF=False
         
         #check within cohort if requested
