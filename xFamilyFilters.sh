@@ -45,10 +45,13 @@ cd $DirNam
 if [[ $ModNam == *X* ]]; then FilPrm=$FilPrm" -X"; fi
 #check for de novo and add flag if necessary
 if [[ $ModNam == *ovo* ]]; then FilPrm=$FilPrm" -D"; fi
+#check for Individual compound heterozygous and flag if necessary
+if [[ "$ModNam" == *IcHet* ]]; then FilPrm=$FilPrm" -P"; fi
 
 echo "Filtering.."
 CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.$ModNam $FilPrm"
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
+if [[ "$ModNam" == *IcHet* ]]; then CMD=$CMD" -f 0.03"; fi
 echo $CMD
 eval $CMD
 
