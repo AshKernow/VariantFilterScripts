@@ -22,6 +22,7 @@
 ################################################################################################################
 ##### GET PARAMETERS                                                                                         ###
 ################################################################################################################
+import gzip
 import os
 from optparse import OptionParser
 parser = OptionParser()
@@ -50,8 +51,10 @@ parser.set_defaults(GQthreshold="30")
 parser.set_defaults(HetAllCountthreshold="3")
 parser.set_defaults(HomAllFracthreshold="0.7")
 
-#### - unused options: b       l    p q  t   w  z 
 
+#### - unused options: b       l    q  t   w  z 
+
+#arguments
 parser.add_option("-d", "--dp", dest="DPthreshold",help="minimum depth of coverage", metavar="DPthreshold")
 parser.add_option("-m", "--mq", dest="MQ0threshold",help="maximum for MQ value, given as a decimal fraction (e.g. 0.05 = 5% of reads for a variant can have MQ0) - fraction of reads with quality 0", metavar="MQ0")
 parser.add_option("-f", "--maf", dest="AllMAF",help="set all Maximum MAF filters to this value", metavar="AllMAF")
@@ -63,6 +66,7 @@ parser.add_option("-g", "--gq", dest="GQthreshold",help="minimum for GQ value", 
 parser.add_option("-i", "--aac", dest="HetAllCountthreshold",help="minimum alternate allele count in heterozygous calls", metavar="HetAllCountthreshold")
 parser.add_option("-j", "--haf", dest="HomAllFracthreshold",help="Fraction of allele counts for homozygous allele", metavar="HomAllFracthreshold")
 
+#Flags
 parser.add_option("-P", "--nopathogenicity", action='store_true', dest="nopatho", help="Do not filter using pathogenicity predictions")
 parser.add_option("-Q", "--noqual", action='store_true', dest="noqual", help="Do NOT filter by vcf FILTER field")
 
@@ -80,7 +84,17 @@ parser.add_option("-Z", "--debug", action='store_true', dest="debug", help="Outp
 ################################################################################################################
 
 ##Assign input and output files
-VCF=open(options.VCFfile,'r')
+FilTyp=str(options.VCFfile)
+FilTyp=FilTyp.split(".")
+FilTyp=str(FilTyp[-1])
+if FilTyp == 'gz':
+    VCF=gzip.open(options.VCFfile,'r')
+elif FilTyp == 'vcf':
+    VCF=open(options.VCFfile,'r')
+else:
+    print "Incorrect vcf file type"
+    sys.exit(1)
+
 BaseName=str(options.OutputFileName)
 DeNovo=options.denovo
 OutputVcf=options.vcfout
@@ -191,7 +205,7 @@ Outlog.write("\n")
 
 ##Start output tables
 AllSamplesList=AlternateSampleList+HeterozygousSampleList+ReferenceSampleList+NotReferenceSampleList+NotAlternateSampleList+NotFilteredSampleList
-headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','MetaSVM','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','SegmentalDuplication','PredictionSummary','VariantCallQuality']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+['AlternateAlleles', 'MetaSVMScore','FILTER', 'INFO']+AllSamplesList
+headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','MetaSVM','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','SegmentalDuplication','Cosmic','PredictionSummary','VariantCallQuality']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+['AlternateAlleles', 'MetaSVMScore','FILTER', 'INFO']+AllSamplesList
 Output.write("\t".join(headerlist)+"\n")
 if DeBug:
     debugheaderlist=['Chromosome','Position','REF','ALT','AAlt','PassExAC','PassKG','PassESP','PassVCF','PassQUAL','PassMQ','PassFunction','PassClass','PassGT','PassDP','PassGQ','PassPatho','PassFilter','PassAFC']
@@ -280,6 +294,7 @@ for line in VCF:
         GeneName=INFOdict.get('GeneName','.')
         VariantFunction=INFOdict.get('VarFunc','none')
         SegDup=INFOdict.get('SegDup','none')
+        Cosmic=INFOdict.get('COSMIC','none')
         
         KGFreqList=str(INFOdict.get('1KGfreq','.'))
         KGFreqList=KGFreqList.split(',')
@@ -431,7 +446,6 @@ for line in VCF:
                 ## Check to see if genotype quality passes
                 if all(i >= GQfilter for i in AlternateGQ) and all(i >= GQfilter for i in HeterozygousGQ) and all(i >= GQfilter for i in ReferenceGQ):
                     PassGQ=True
-            
             ################################################################################################################
             ##### CHECK TO SEE IF GENOTYPES PASS, ITERATE ACROSS MULTIPLE ALT ALLELES IF NECESSARY                      ###
             ################################################################################################################
@@ -639,7 +653,7 @@ for line in VCF:
                     ALT=str(AltAlls[altnum])
                     cltnum=min(len(GERPscoreList)-1, altnum)
                     GERPscore=str(GERPscoreList[cltnum])
-                    OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,SVMprediction,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,SegDup,PathoLevel,FILTER]+AllSampleGT+AllSampleAD+[AltAllsStr,SVMscore,VariantFilter,INFOstring]+AlternateQualityString+HeterozygousQualityString+ReferenceQualityString+NotReferenceQualityString+NotAlternateQualityString+NotFilteredQualityString
+                    OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,SVMprediction,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,SegDup,Cosmic,PathoLevel,FILTER]+AllSampleGT+AllSampleAD+[AltAllsStr,SVMscore,VariantFilter,INFOstring]+AlternateQualityString+HeterozygousQualityString+ReferenceQualityString+NotReferenceQualityString+NotAlternateQualityString+NotFilteredQualityString
                     OutputList= [ str(i) for i in OutputList ]
                     OutputString="\t".join(OutputList)
                     Output.write(OutputString+"\n")
