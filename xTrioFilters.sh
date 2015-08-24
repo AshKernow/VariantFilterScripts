@@ -1,5 +1,5 @@
 #!/bin/bash
-#$ -cwd -l mem=1G,time=1:: -N FilterTrio
+#$ -cwd -l mem=1G,time=3:: -N FilterTrio
 
 usage="(-t 1-X) xTrioFilters.sh -v <vcf file> -t <Trio Table> -n <Output Directory> -p <Additional Parameters> -D <ignore de novo quality> -H <this message>"
 
@@ -47,73 +47,73 @@ cd $DirNam
 
 #De novo
 echo "De Novo Filtering.."
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.denovo --het $Proband --ref $Father,$Mother"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.Trio.denovo --het $Proband --ref $Father,$Mother"
 if [[ "$BadDeN" == "false" ]]; then CMD=$CMD" -D"; fi #otherwise de novos will be run with default filters
 if [[ -n $Extras ]]; then CMD=$CMD" --unfl $Extras"; fi
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
-LEN=`cat $FamNam.denovo.tsv | wc -l`
+LEN=`cat $FamNam.Trio.denovo.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.denovo.tsv
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.denovo.tsv
 fi
 
 #Autosomal Recessive
 echo "Autosomal Recessive.."
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.AR --alt $Proband --het $Father,$Mother"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.Trio.AR --alt $Proband --het $Father,$Mother"
 if [[ -n $Extras ]]; then CMD=$CMD" --unfl $Extras"; fi
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
-LEN=`cat $FamNam.AR.tsv | wc -l`
+LEN=`cat $FamNam.Trio.AR.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.AR.tsv
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.AR.tsv
 fi
 
 #X linked - male proband
 echo "X linked - male proband.."
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.X-linked --alt $Proband --het $Mother --ref $Father -X"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.Trio.X-linked --alt $Proband --het $Mother --ref $Father -X"
 if [[ -n $Extras ]]; then CMD=$CMD" --unfl $Extras"; fi
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
-LEN=`cat $FamNam.X-linked.tsv | wc -l`
+LEN=`cat $FamNam.Trio.X-linked.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.X-linked.tsv
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.X-linked.tsv
 fi
 
 #Autosomal Dominant - paternal inheritance
 echo "Autosomal Dominant - paternal inheritance.."
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.AD-paternal  --het $Proband,$Father --ref $Mother"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.Trio.AD-paternal  --het $Proband,$Father --ref $Mother"
 if [[ -n $Extras ]]; then CMD=$CMD" --unfl $Extras"; fi
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
-LEN=`cat $FamNam.AD-paternal.tsv | wc -l`
+LEN=`cat $FamNam.Trio.AD-paternal.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.AD-paternal.tsv
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.AD-paternal.tsv
 fi
 
 #Autosomal Dominant - maternal inheritance
 echo "Autosomal Dominant - maternal inheritance.."
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.AD-maternal  --het $Proband,$Mother --ref $Father"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.Trio.AD-maternal  --het $Proband,$Mother --ref $Father"
 if [[ -n $Extras ]]; then CMD=$CMD" --unfl $Extras"; fi
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
-LEN=`cat $FamNam.AD-maternal.tsv | wc -l`
+LEN=`cat $FamNam.Trio.AD-maternal.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.AD-maternal.tsv
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.AD-maternal.tsv
 fi
 
 #compound heterozygous
 echo "Compund heterozygous.."
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.tempheppat  --het $Proband,$Father --ref $Mother -P  -f 0.03"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.Trio.tempheppat  --het $Proband,$Father --ref $Mother -P  -f 0.03"
 if [[ -n $Extras ]]; then CMD=$CMD" --unfl $Extras"; fi
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
 eval $CMD
-CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.temphepmat  --het $Proband,$Mother --ref $Father -P  -f 0.03"
+CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.Trio.temphepmat  --het $Proband,$Mother --ref $Father -P  -f 0.03"
 if [[ -n $Extras ]]; then CMD=$CMD" --unfl $Extras"; fi
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
@@ -121,21 +121,21 @@ eval $CMD
 R --vanilla <<RSCRIPT
 options(stringsAsFactors=F)
 
-mathet <- read.delim("$FamNam.temphepmat.tsv")
-pathet <- read.delim("$FamNam.tempheppat.tsv")
+mathet <- read.delim("$FamNam.Trio.temphepmat.tsv")
+pathet <- read.delim("$FamNam.Trio.tempheppat.tsv")
 
 mathet <- mathet[mathet[,"Gene"]%in%pathet[,"Gene"],]
 pathet <- pathet[pathet[,"Gene"]%in%mathet[,"Gene"],]
 
 comphet <- rbind(mathet, pathet)
 comphet <- comphet[order(comphet[,"Chromosome"], comphet[,"Position"]),]
-write.table(comphet, "$FamNam.compound_heterozygous.tsv", col.names=T, row.names=F, quote=F, sep="\t")
+write.table(comphet, "$FamNam.Trio.compound_heterozygous.tsv", col.names=T, row.names=F, quote=F, sep="\t")
 RSCRIPT
-cat $FamNam.tempheppat.log $FamNam.temphepmat.log > $FamNam.compound_heterozygous.log
-LEN=`cat $FamNam.compound_heterozygous.tsv | wc -l`
+cat $FamNam.Trio.tempheppat.log $FamNam.Trio.temphepmat.log > $FamNam.Trio.compound_heterozygous.log
+LEN=`cat $FamNam.Trio.compound_heterozygous.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.compound_heterozygous.tsv
+    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.compound_heterozygous.tsv
 fi
 
 
-rm -rf *temp*
+rm -rf $FamNam.Trio.temp*
