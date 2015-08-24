@@ -59,18 +59,36 @@ echo $CMD2
 eval $CMD2
 
 
-#annotate using R
+##annotate using R
 R --vanilla <<RSCRIPT
 options(stringsAsFactors=F)
 #get data
 dat.all <- read.delim("$InpFil", colClasses="character")
 
 dat <- dat.all[,1:(grep("AlternateAlleles", colnames(dat.all)))]
+# Add a AAF column for Wen-I
+ADcols <- grep("AD$", colnames(dat))
+GTcols <- grep("GT$", colnames(dat))
+for(j in 1:length(ADcols)){
+    dat <- cbind(dat, 0)
+    ADcol <- ADcols[j]
+    GTcol <- GTcols[j]
+    nam <- gsub("AD", "AAF", colnames(dat)[ADcol])
+    colnames(dat)[ncol(dat)] <- nam
+    for(i in 1:nrow(dat)){
+        AAs <- as.numeric(strsplit(dat[i,GTcol], "/")[[1]])
+        AAs <- AAs[AAs!=0]+1
+        ADs <- as.numeric(strsplit(dat[i,ADcol], ",")[[1]])
+        tot <- sum(ADs)
+        AAFs <- round(ADs[AAs]/tot,5)
+        if(length(AAFs)==0) AAFs <- 0
+        dat[i,nam] <- paste(AAFs, collapse=",")
+    }
+}
 #add leading space to genotypes to deal with Excel date format issue and read depths to stop auto correction to numbers
-GTADcols <- grep("GT$|AD$", colnames(dat))
-for(i in GTADcols){
-  dat[,i] <- paste(" ", dat[,i], sep="")
-  dat[,i] <- gsub(",", ", ", dat[,i])
+for(i in c(GTcols, ADcols)){
+    dat[,i] <- paste(" ", dat[,i], sep="")
+    dat[,i] <- gsub(",", ", ", dat[,i])
 }
 #get annotation table and extract relevant lines
 annot <- read.delim("$AnnTab")
