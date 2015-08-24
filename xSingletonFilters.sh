@@ -76,4 +76,4 @@ LEN=`cat $Proband.compound_heterozygous.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
     qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $Proband.compound_heterozygous.tsv
 fi
-rm *tempcHet*
+rm $Proband.tempcHet*
