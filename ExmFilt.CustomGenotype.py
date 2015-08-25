@@ -205,7 +205,7 @@ Outlog.write("\n")
 
 ##Start output tables
 AllSamplesList=AlternateSampleList+HeterozygousSampleList+ReferenceSampleList+NotReferenceSampleList+NotAlternateSampleList+NotFilteredSampleList
-headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','MetaSVM','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','SegmentalDuplication','Cosmic','PredictionSummary','VariantCallQuality']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+['AlternateAlleles', 'MetaSVMScore','FILTER', 'INFO']+AllSamplesList
+headerlist=['Chromosome','Position','ID','REF','ALT','Gene','VariantFunction','VariantClass','AAchange','AlleleFrequency.ExAC','AlleleFrequency.1KG','AlleleFrequency.ESP','MetaSVM','SIFTprediction','PP2prediction','MAprediction','MTprediction','GERP++','CADDscore','SegmentalDuplication','Cosmic','PredictionSummary','VariantCallQuality']+[ i+" GT" for i in AllSamplesList]+[ i+" AD" for i in AllSamplesList]+['AlternateAlleles', 'MetaSVMScore','FILTER', 'INFO']+AllSamplesList+['ESP.aa','ESP.ea','1KG.eur','1KG.amr','1KG.eas','1KG.afr','1KG.sas','ExAC.afr','ExAC.amr','ExAC.eas','ExAC.fin','ExAC.nfe','ExAC.oth','ExAC.sas']
 Output.write("\t".join(headerlist)+"\n")
 if DeBug:
     debugheaderlist=['Chromosome','Position','REF','ALT','AAlt','PassExAC','PassKG','PassESP','PassVCF','PassQUAL','PassMQ','PassFunction','PassClass','PassGT','PassDP','PassGQ','PassPatho','PassFilter','PassAFC']
@@ -305,6 +305,39 @@ for line in VCF:
         VCFFreqList=str(INFOdict.get('AF',0))
         VCFFreqList=VCFFreqList.split(",")
         
+        #population specific
+        ESPaaFreqList=str(INFOdict.get('ESP.aa.freq','.'))
+        ESPeaFreqList=str(INFOdict.get('ESP.ea.freq','.'))
+        KGeurFreqList=str(INFOdict.get('1KG.eur.freq','.'))
+        KGamrFreqList=str(INFOdict.get('1KG.amr.freq','.'))
+        KGeasFreqList=str(INFOdict.get('1KG.eas.freq','.'))
+        KGafrFreqList=str(INFOdict.get('1KG.afr.freq','.'))
+        KGsasFreqList=str(INFOdict.get('1KG.sas.freq','.'))
+        ExACafrFreqList=str(INFOdict.get('ExAC.afr.freq','.'))
+        ExACamrFreqList=str(INFOdict.get('ExAC.amr.freq','.'))
+        ExACeasFreqList=str(INFOdict.get('ExAC.eas.freq','.'))
+        ExACfinFreqList=str(INFOdict.get('ExAC.fin.freq','.'))
+        ExACnfeFreqList=str(INFOdict.get('ExAC.nfe.freq','.'))
+        ExACothFreqList=str(INFOdict.get('ExAC.oth.freq','.'))
+        ExACsasFreqList=str(INFOdict.get('ExAC.sas.freq','.'))
+        
+        ESPaaFreqList=ESPaaFreqList.split(',')
+        ESPeaFreqList=ESPeaFreqList.split(',')
+        KGeurFreqList=KGeurFreqList.split(',')
+        KGamrFreqList=KGamrFreqList.split(',')
+        KGeasFreqList=KGeasFreqList.split(',')
+        KGafrFreqList=KGafrFreqList.split(',')
+        KGsasFreqList=KGsasFreqList.split(',')
+        ExACafrFreqList=ExACafrFreqList.split(',')
+        ExACamrFreqList=ExACamrFreqList.split(',')
+        ExACeasFreqList=ExACeasFreqList.split(',')
+        ExACfinFreqList=ExACfinFreqList.split(',')
+        ExACnfeFreqList=ExACnfeFreqList.split(',')
+        ExACothFreqList=ExACothFreqList.split(',')
+        ExACsasFreqList=ExACsasFreqList.split(',')
+
+        
+        #Variant effect predictors
         VariantClassList=INFOdict.get('VarClass','none')
         VariantClassList=VariantClassList.split(',')
         AAchangeList=INFOdict.get('AAChange','.')
@@ -527,45 +560,61 @@ for line in VCF:
                 if VariantClass != 'synonymousSNV':
                     PassClass=True
                 
+                ## a function to get the requisite frequency value, if the annotation was missing in the vcf then we have only a single "." so need to adjust the index number, also for "." return 0
+                def getInfoVal ( InfoFieldList ):
+                    cltnum=min(len(InfoFieldList)-1, altnum)
+                    InfoField=str(InfoFieldList[cltnum])
+                    if InfoField == ".":
+                        InfoFieldTest=float(0)
+                    else:
+                        InfoFieldTest=float(InfoField)
+                    return [InfoField,InfoFieldTest]
+                
+                
+                
                 ## Check if KG passes threshold
                 PassKG=False
-                cltnum=min(len(KGFreqList)-1, altnum)
-                KGFreq=str(KGFreqList[cltnum])
-                if KGFreq == ".":
-                    KGFreqtest=float(0)
-                else:
-                    KGFreqtest=float(KGFreq)
+                KGFreq=getInfoVal(KGFreqList)[0]
+                KGFreqtest=getInfoVal(KGFreqList)[1]
                 if KGFreqtest <= OneKGfilter:
                     PassKG=True
                 
                 ## Check if ESP passes threshold
                 PassESP=False
-                cltnum=min(len(ESPFreqList)-1, altnum)
-                ESPFreq=str(ESPFreqList[cltnum])
-                if ESPFreq == ".":
-                    ESPFreqtest=float(0)
-                else:
-                    ESPFreqtest=float(ESPFreq)
+                ESPFreq=getInfoVal(ESPFreqList)[0]
+                ESPFreqtest=getInfoVal(ESPFreqList)[1]
                 if ESPFreqtest <= ESPfilter:
                     PassESP=True
                     
                 ## Check if ExAC passes threshold
                 PassExAC=False
-                cltnum=min(len(ExACFreqList)-1, altnum)
-                ExACFreq=str(ExACFreqList[cltnum])
-                if ExACFreq == ".":
-                    ExACFreqtest=float(0)
-                else:
-                    ExACFreqtest=float(ExACFreq)
+                ExACFreq=getInfoVal(ExACFreqList)[0]
+                ExACFreqtest=getInfoVal(ExACFreqList)[1]
                 if ExACFreqtest <= ExACfilter:
                     PassExAC=True
                 
                 ## Check if VCF passes threshold
                 PassVCF=False
-                cltnum=min(len(VCFFreqList)-1, altnum)
-                VCFFreqtest=float(VCFFreqList[cltnum])
+                VCFFreqtest=getInfoVal(VCFFreqList)[1]
                 if VCFFreqtest <= CHTfilter:
                     PassVCF=True
+                
+                #get the population specific frequencies
+                ESPaaFreq=getInfoVal(ESPaaFreqList)[0]
+                ESPeaFreq=getInfoVal(ESPeaFreqList)[0]
+                KGeurFreq=getInfoVal(KGeurFreqList)[0]
+                KGamrFreq=getInfoVal(KGamrFreqList)[0]
+                KGeasFreq=getInfoVal(KGeasFreqList)[0]
+                KGafrFreq=getInfoVal(KGafrFreqList)[0]
+                KGsasFreq=getInfoVal(KGsasFreqList)[0]
+                ExACafrFreq=getInfoVal(ExACafrFreqList)[0]
+                ExACamrFreq=getInfoVal(ExACamrFreqList)[0]
+                ExACeasFreq=getInfoVal(ExACeasFreqList)[0]
+                ExACfinFreq=getInfoVal(ExACfinFreqList)[0]
+                ExACnfeFreq=getInfoVal(ExACnfeFreqList)[0]
+                ExACothFreq=getInfoVal(ExACothFreqList)[0]
+                ExACsasFreq=getInfoVal(ExACsasFreqList)[0]
+
                 
                 ## Check and annotate pathogenicity (discard missense predicted to be benign - need to adjust this in splicining regions)
                 
@@ -653,7 +702,7 @@ for line in VCF:
                     ALT=str(AltAlls[altnum])
                     cltnum=min(len(GERPscoreList)-1, altnum)
                     GERPscore=str(GERPscoreList[cltnum])
-                    OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,SVMprediction,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,SegDup,Cosmic,PathoLevel,FILTER]+AllSampleGT+AllSampleAD+[AltAllsStr,SVMscore,VariantFilter,INFOstring]+AlternateQualityString+HeterozygousQualityString+ReferenceQualityString+NotReferenceQualityString+NotAlternateQualityString+NotFilteredQualityString
+                    OutputList=linelist[0:4]+[ALT,GeneName,VariantFunction,VariantClass,AAchange,ExACFreq,KGFreq,ESPFreq,SVMprediction,SIFTprediction,PP2prediction,MAprediction,MTprediction,GERPscore,CADDscore,SegDup,Cosmic,PathoLevel,FILTER]+AllSampleGT+AllSampleAD+[AltAllsStr,SVMscore,VariantFilter,INFOstring]+AlternateQualityString+HeterozygousQualityString+ReferenceQualityString+NotReferenceQualityString+NotAlternateQualityString+NotFilteredQualityString+[ESPaaFreq,ESPeaFreq,KGeurFreq,KGamrFreq,KGeasFreq,KGafrFreq,KGsasFreq,ExACafrFreq,ExACamrFreq,ExACeasFreq,ExACfinFreq,ExACnfeFreq,ExACothFreq,ExACsasFreq]
                     OutputList= [ str(i) for i in OutputList ]
                     OutputString="\t".join(OutputList)
                     Output.write(OutputString+"\n")
