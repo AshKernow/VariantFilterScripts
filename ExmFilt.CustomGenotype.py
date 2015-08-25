@@ -289,75 +289,50 @@ for line in VCF:
                 FieldName,FieldValue=element.split('=',1)
                 INFOdict[FieldName]=FieldValue
         
-        DPnumber=float(INFOdict.get('DP','1'))
-        MQ0number=float(INFOdict.get('MQ0','0'))
+        #Variant details
         GeneName=INFOdict.get('GeneName','.')
         VariantFunction=INFOdict.get('VarFunc','none')
-        SegDup=INFOdict.get('SegDup','none')
-        Cosmic=INFOdict.get('COSMIC','none')
+        VariantClassList=INFOdict.get('VarClass','none').split(',')
+        AAchangeList=INFOdict.get('AAChange','.').split(',')
         
-        KGFreqList=str(INFOdict.get('1KGfreq','.'))
-        KGFreqList=KGFreqList.split(',')
-        ESPFreqList=str(INFOdict.get('ESPfreq','.'))
-        ESPFreqList=ESPFreqList.split(',')
-        ExACFreqList=str(INFOdict.get('ExACfreq','.'))
-        ExACFreqList=ExACFreqList.split(",")
-        VCFFreqList=str(INFOdict.get('AF',0))
-        VCFFreqList=VCFFreqList.split(",")
+        #Calling quality
+        DPnumber=float(INFOdict.get('DP','1'))
+        MQ0number=float(INFOdict.get('MQ0','0'))
+        SegDup=INFOdict.get('SegDup','none')
+        
+        #Allele Frequencies
+        KGFreqList=str(INFOdict.get('1KGfreq','.')).split(',')
+        ESPFreqList=str(INFOdict.get('ESPfreq','.')).split(',')
+        ExACFreqList=str(INFOdict.get('ExACfreq','.')).split(",")
+        VCFFreqList=str(INFOdict.get('AF',0)).split(",")
         
         #population specific
-        ESPaaFreqList=str(INFOdict.get('ESP.aa.freq','.'))
-        ESPeaFreqList=str(INFOdict.get('ESP.ea.freq','.'))
-        KGeurFreqList=str(INFOdict.get('1KG.eur.freq','.'))
-        KGamrFreqList=str(INFOdict.get('1KG.amr.freq','.'))
-        KGeasFreqList=str(INFOdict.get('1KG.eas.freq','.'))
-        KGafrFreqList=str(INFOdict.get('1KG.afr.freq','.'))
-        KGsasFreqList=str(INFOdict.get('1KG.sas.freq','.'))
-        ExACafrFreqList=str(INFOdict.get('ExAC.afr.freq','.'))
-        ExACamrFreqList=str(INFOdict.get('ExAC.amr.freq','.'))
-        ExACeasFreqList=str(INFOdict.get('ExAC.eas.freq','.'))
-        ExACfinFreqList=str(INFOdict.get('ExAC.fin.freq','.'))
-        ExACnfeFreqList=str(INFOdict.get('ExAC.nfe.freq','.'))
-        ExACothFreqList=str(INFOdict.get('ExAC.oth.freq','.'))
-        ExACsasFreqList=str(INFOdict.get('ExAC.sas.freq','.'))
-        
-        ESPaaFreqList=ESPaaFreqList.split(',')
-        ESPeaFreqList=ESPeaFreqList.split(',')
-        KGeurFreqList=KGeurFreqList.split(',')
-        KGamrFreqList=KGamrFreqList.split(',')
-        KGeasFreqList=KGeasFreqList.split(',')
-        KGafrFreqList=KGafrFreqList.split(',')
-        KGsasFreqList=KGsasFreqList.split(',')
-        ExACafrFreqList=ExACafrFreqList.split(',')
-        ExACamrFreqList=ExACamrFreqList.split(',')
-        ExACeasFreqList=ExACeasFreqList.split(',')
-        ExACfinFreqList=ExACfinFreqList.split(',')
-        ExACnfeFreqList=ExACnfeFreqList.split(',')
-        ExACothFreqList=ExACothFreqList.split(',')
-        ExACsasFreqList=ExACsasFreqList.split(',')
-
+        ESPaaFreqList=str(INFOdict.get('ESP.aa.freq','.')).split(',')
+        ESPeaFreqList=str(INFOdict.get('ESP.ea.freq','.')).split(',')
+        KGeurFreqList=str(INFOdict.get('1KG.eur.freq','.')).split(',')
+        KGamrFreqList=str(INFOdict.get('1KG.amr.freq','.')).split(',')
+        KGeasFreqList=str(INFOdict.get('1KG.eas.freq','.')).split(',')
+        KGafrFreqList=str(INFOdict.get('1KG.afr.freq','.')).split(',')
+        KGsasFreqList=str(INFOdict.get('1KG.sas.freq','.')).split(',')
+        ExACafrFreqList=str(INFOdict.get('ExAC.afr.freq','.')).split(',')
+        ExACamrFreqList=str(INFOdict.get('ExAC.amr.freq','.')).split(',')
+        ExACeasFreqList=str(INFOdict.get('ExAC.eas.freq','.')).split(',')
+        ExACfinFreqList=str(INFOdict.get('ExAC.fin.freq','.')).split(',')
+        ExACnfeFreqList=str(INFOdict.get('ExAC.nfe.freq','.')).split(',')
+        ExACothFreqList=str(INFOdict.get('ExAC.oth.freq','.')).split(',')
+        ExACsasFreqList=str(INFOdict.get('ExAC.sas.freq','.')).split(',')
         
         #Variant effect predictors
-        VariantClassList=INFOdict.get('VarClass','none')
-        VariantClassList=VariantClassList.split(',')
-        AAchangeList=INFOdict.get('AAChange','.')
-        AAchangeList=AAchangeList.split(',')
-        SIFTpredictionList=INFOdict.get('SIFTprd','.')
-        SIFTpredictionList=SIFTpredictionList.split(',')
+        Cosmic=INFOdict.get('COSMIC','none')
+        SIFTpredictionList=INFOdict.get('SIFTprd','.').split(',')
         PP2predictionList=INFOdict.get('PP2.hvar.prd','.')
         PP2predictionList=PP2predictionList.split(',')
-        MApredictionList=INFOdict.get('MutAprd','.')
-        MApredictionList=MApredictionList.split(',')
-        MTpredictionList=INFOdict.get('MutTprd','.')
-        MTpredictionList=MTpredictionList.split(',')
-        GERPscoreList=str(INFOdict.get('GERP','.'))
-        GERPscoreList=GERPscoreList.split(',')
-        CADDscoreList=str(INFOdict.get('CADDphred','.'))
-        CADDscoreList=CADDscoreList.split(',')
-        SVMscoreList=INFOdict.get('MetaSVMscr','.')
-        SVMscoreList=SVMscoreList.split(',')
-        SVMpredictionList=INFOdict.get('MetaSVMprd','.')
-        SVMpredictionList=SVMpredictionList.split(',')
+        MApredictionList=INFOdict.get('MutAprd','.').split(',')
+        MTpredictionList=INFOdict.get('MutTprd','.').split(',')
+        GERPscoreList=str(INFOdict.get('GERP','.')).split(',')
+        CADDscoreList=str(INFOdict.get('CADDphred','.')).split(',')
+        SVMscoreList=INFOdict.get('MetaSVMscr','.').split(',')
+        SVMpredictionList=INFOdict.get('MetaSVMprd','.').split(',')
         
         ## Get Sample Level Variant information
         AlternateQualityString=[ linelist[i].strip() for i in AlternateColumnNumber ]
@@ -395,7 +370,7 @@ for line in VCF:
         
         ## Check if MQ0 passes threshold
         PassMQ=False
-        MQ0Fraction=MQ0number/DPnumber
+        MQ0Fraction=float(MQ0number)/float(DPnumber)
         if MQ0Fraction <= MQ0filter:
             PassMQ=True
          
@@ -426,6 +401,8 @@ for line in VCF:
         PassGeno=False
         if './.' not in AlternateGT and './.' not in HeterozygousGT and './.' not in ReferenceGT and './.' not in NotReferenceGT and './.' not in NotAlternateGT:
             PassGeno=True
+        
+        print linelist[0:4]
         
         if PassGeno and PassFunction and PassMQ and PassQUAL:
             ################################################################################################################
