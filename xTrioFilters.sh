@@ -1,34 +1,28 @@
 #!/bin/bash
 #$ -cwd -l mem=1G,time=3:: -N FilterTrio
 
-usage="(-t 1-X) xTrioFilters.sh -v <vcf file> -t <Trio Table> -n <Output Directory> -p <Additional Parameters> -D <ignore de novo quality> -H <this message>"
+usage="xTrioFilters.sh -v <vcf file> -t <Trio Table> -n <Output Directory> -a <The line of the Trio Table to analyse> -p <Additional Parameters> -D <ignore de novo quality> -H <this message>"
 
 BadDeN=false
+ArrNum=1
 #get arguments
-while getopts v:t:n:p:DH opt; do
+while getopts v:t:n:a:p:DH opt; do
     case "$opt" in
         v) VcfFil="$OPTARG";;
         t) TrioFil="$OPTARG";;
         n) DirPre="$OPTARG";;
+        a) ArrNum="$OPTARG";;
         p) AddPrm="$OPTARG";;
         D) BadDeN="true";;
         H) echo "$usage"; exit;;
     esac
 done
 
-FiltScrDir="/ifs/scratch/c2b2/af_lab/ads2202/Exome_Seq/scripts/Filtering_scripts/"
+FiltScrDir="/home/local/ARCS/ads2202/scripts/Filtering_scripts"
 
 VcfFil=`readlink -f $VcfFil`
 TrioFil=`readlink -f $TrioFil`
 
-
-if [[ "$SGE_TASK_ID" != "undefined" ]]; then
-        ArrNum=$SGE_TASK_ID
-else
-        ArrNum=1
-fi
-
-echo $ArrNum
 
 FamNam=`cut -f 1 $TrioFil | head -n $ArrNum | tail -n 1`
 Proband=`cut -f 2 $TrioFil | head -n $ArrNum | tail -n 1`
@@ -55,7 +49,7 @@ echo $CMD
 eval $CMD
 LEN=`cat $FamNam.Trio.denovo.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.denovo.tsv
+    nohup $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.denovo.tsv &
 fi
 
 #Autosomal Recessive
@@ -67,7 +61,7 @@ echo $CMD
 eval $CMD
 LEN=`cat $FamNam.Trio.AR.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.AR.tsv
+    nohup $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.AR.tsv &
 fi
 
 #X linked - male proband
@@ -79,7 +73,7 @@ echo $CMD
 eval $CMD
 LEN=`cat $FamNam.Trio.X-linked.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.X-linked.tsv
+    nohup $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.X-linked.tsv &
 fi
 
 #Autosomal Dominant - paternal inheritance
@@ -91,7 +85,7 @@ echo $CMD
 eval $CMD
 LEN=`cat $FamNam.Trio.AD-paternal.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.AD-paternal.tsv
+    nohup $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.AD-paternal.tsv &
 fi
 
 #Autosomal Dominant - maternal inheritance
@@ -103,7 +97,7 @@ echo $CMD
 eval $CMD
 LEN=`cat $FamNam.Trio.AD-maternal.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.AD-maternal.tsv
+    nohup $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.AD-maternal.tsv &
 fi
 
 #compound heterozygous
@@ -134,7 +128,7 @@ RSCRIPT
 cat $FamNam.Trio.tempheppat.log $FamNam.Trio.temphepmat.log > $FamNam.Trio.compound_heterozygous.log
 LEN=`cat $FamNam.Trio.compound_heterozygous.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.compound_heterozygous.tsv
+    nohup $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.Trio.compound_heterozygous.tsv &
 fi
 
 
