@@ -73,6 +73,7 @@ parser.add_option("-Q", "--noqual", action='store_true', dest="noqual", help="Do
 parser.add_option("-X", "--xlinked", action='store_true', dest="xlink", help="Only output X chromosome")
 parser.add_option("-D", "--denovo", action='store_true', dest="denovo", help="Use higher stringency filters for de novo")
 parser.add_option("-V", "--vcfout", action='store_true', dest="vcfout", help="Output the selected variants in vcf format")
+parser.add_option("-S", "--keepsyn", action='store_true', dest="keepsyn", help="Keep synonymous variants as well")
 
 
 parser.add_option("-Z", "--debug", action='store_true', dest="debug", help="Output a boolean decision file for debugging purposes")
@@ -96,12 +97,14 @@ else:
     sys.exit(1)
 
 BaseName=str(options.OutputFileName)
-DeNovo=options.denovo
-OutputVcf=options.vcfout
-DeBug=options.debug
+
 NoPatho=options.nopatho
 NoQualityFilter=options.noqual
 XLink=options.xlink
+DeNovo=options.denovo
+OutputVcf=options.vcfout
+DeBug=options.debug
+KeepSyn=options.keepsyn
 TabOutputFilename=BaseName+'.tsv'
 VcfOutputFilename=BaseName+'.vcf'
 LogOutputFilename=BaseName+'.log'
@@ -220,13 +223,14 @@ if DeBug:
 NameToColumn={}
 ColumnToName={}
 OrigCount=0
-FiltCount=[0,0]
-MissenseCount=[0,0]
-NonFrameshiftCount=[0,0]
-FrameshiftCount=[0,0]
-NonsenseCount=[0,0]
-SplicingCount=[0,0]
-UnknownCount=[0,0]
+FiltCount=[0,0,0]
+SilentCount=[0,0,0]
+MissenseCount=[0,0,0]
+NonFrameshiftCount=[0,0,0]
+FrameshiftCount=[0,0,0]
+NonsenseCount=[0,0,0]
+SplicingCount=[0,0,0]
+UnknownCount=[0,0,0]
 
 for line in VCF:
     if '#' in line and OutputVcf: Outvcf.write(line)
@@ -402,8 +406,6 @@ for line in VCF:
         if './.' not in AlternateGT and './.' not in HeterozygousGT and './.' not in ReferenceGT and './.' not in NotReferenceGT and './.' not in NotAlternateGT:
             PassGeno=True
         
-        print linelist[0:4]
-        
         if PassGeno and PassFunction and PassMQ and PassQUAL:
             ################################################################################################################
             ##### SAMPLES - DP and GQ                                                                                    ###
@@ -454,7 +456,7 @@ for line in VCF:
                 NotReferenceGQ=[ float(NotReferenceQualityList[i][GQind]) for i in range(0,len(NotReferenceQualityString)) ]
                 NotAlternateGQ=[ float(NotAlternateQualityList[i][GQind]) for i in range(0,len(NotAlternateQualityString)) ]
                 ## Check to see if genotype quality passes
-                if all(i >= GQfilter for i in AlternateGQ) and all(i >= GQfilter for i in HeterozygousGQ) and all(i >= GQfilter for i in ReferenceGQ):
+                if all(i >= GQfilter for i in AlternateGQ) and all(i >= GQfilter for i in HeterozygousGQ) and all(i >= GQfilter for i in ReferenceGQ) and all(i >= GQfilter for i in NotReferenceGQ) and all(i >= GQfilter for i in NotAlternateGQ):
                     PassGQ=True
             ################################################################################################################
             ##### CHECK TO SEE IF GENOTYPES PASS, ITERATE ACROSS MULTIPLE ALT ALLELES IF NECESSARY                      ###
@@ -519,11 +521,16 @@ for line in VCF:
                     NotAlternateRAC=[ int(i[0]) for i in NotAlternateAC ]
                     NotAlternateRAF=[ float(i)/float(max(j,1)) for i,j in zip(NotAlternateRAC,NotAlternateTotal) ]
                     
-                    NotFilteredAC=[ NotFilteredQualityList[i][ADind] for i in range(0,len(NotFilteredQualityString)) ]
+                    NotFilteredAC=list()
+                    for i in range(0,len(NotFilteredQualityString)):
+                        if './.' not in NotFilteredQualityList[i]:
+                            NotFilteredAC.append(NotFilteredQualityList[i][ADind])
+                        else:
+                            NotFilteredAC.append(0)
                     AllSampleAD=AllSampleAD+NotFilteredAC
                     
                     ##Check alternate allele counts and fractions
-                    if all( i >= HetAllCountFilter for i in HeterozygousAC) and all( i >= HomAllFrac for i in AlternateAAF) and all( i >= HomAllFrac for i in ReferenceAAF):
+                    if all( i >= HetAllCountFilter for i in HeterozygousAC) and all( i >= HomAllFrac for i in AlternateAAF) and all( i >= HomAllFrac for i in ReferenceAAF) and all( ( i.count(AltAll)==1 and j >= HetAllCountFilter ) or ( i.count(AltAll)==2 and k >= HomAllFrac ) for i,j,k in zip(NotReferenceGT,NotReferenceAC,NotReferenceAAF) ) and all( ( i.count(AltAll)==1 and j >= HetAllCountFilter ) or ( i.count(AltAll)==0 and k >= HomAllFrac ) for i,j,k in zip(NotAlternateGT,NotAlternateAC,NotAlternateRAF) ):
                         PassAFC=True
                     
                 ################################################################################################################
@@ -631,6 +638,8 @@ for line in VCF:
                 if VariantClass in InDelClass or VariantClass in NonsenseClass:
                     PathoLevel="High"
                     PassPatho=True
+                if VariantClass == "synonymousSNV":
+                    PathoLevel="Silent"
                 
                 ##check variant specific FILTER
                 PassFilter=False
@@ -658,6 +667,10 @@ for line in VCF:
                     PassAFC=True
                 if NoPatho:
                     PassPatho=True
+                if KeepSyn and VariantClass == "synonymousSNV":
+                    PassClass=True
+                    PassPatho=True
+                    
                 ################################################################################################################
                 ##### OUTPUTS                                                                                                ###
                 ################################################################################################################
@@ -690,9 +703,13 @@ for line in VCF:
                     ################################################################################################################
                     
                     cntnum=0
-                    if PathoLevel=="High":
+                    if PathoLevel=="Medium":
                         cntnum=1
+                    if PathoLevel=="High":
+                        cntnum=2
                     FiltCount[cntnum] = FiltCount[cntnum] + 1
+                    if VariantClass == "synonymousSNV":
+                        SilentCount[cntnum] = SilentCount[cntnum] + 1
                     if VariantClass in MissenseClass:
                         MissenseCount[cntnum] = MissenseCount[cntnum] + 1
                     if VariantClass in NonFrameshiftClass:
@@ -735,13 +752,14 @@ Outlog.write("\n")
 Outlog.write("---------------------------------------------------------------------\n")
 Outlog.write("Results: \n")
 Outlog.write("\t Number of variants in original VCF: "+str(OrigCount)+"\n")
-Outlog.write("\t Number of variants selected (Med/High/Total): "+str(FiltCount[0])+"/"+str(FiltCount[1])+"/"+str(sum(FiltCount))+"\n")
-Outlog.write("\t Number of Missense variants selected (Med/High/Total): "+str(MissenseCount[0])+"/"+str(MissenseCount[1])+"/"+str(sum(MissenseCount))+"\n")
-Outlog.write("\t Number of Nonsense variants selected (Med/High/Total): "+str(NonsenseCount[0])+"/"+str(NonsenseCount[1])+"/"+str(sum(NonsenseCount))+"\n")
-Outlog.write("\t Number of NonFrameshift InDels selected (Med/High/Total): "+str(NonFrameshiftCount[0])+"/"+str(NonFrameshiftCount[1])+"/"+str(sum(NonFrameshiftCount))+"\n")
-Outlog.write("\t Number of Frameshift InDels selected (Med/High/Total): "+str(FrameshiftCount[0])+"/"+str(FrameshiftCount[1])+"/"+str(sum(FrameshiftCount))+"\n")
-Outlog.write("\t Number of Splice site variants selected (Med/High/Total): "+str(SplicingCount[0])+"/"+str(SplicingCount[1])+"/"+str(sum(SplicingCount))+"\n")
-Outlog.write("\t Number of Unknown function variants selected (Med/High/Total): "+str(UnknownCount[0])+"/"+str(UnknownCount[1])+"/"+str(sum(UnknownCount))+"\n")
+Outlog.write("\t Number of variants selected (Low/Med/High/Total): "+str(FiltCount[0])+"/"+str(FiltCount[1])+"/"+str(FiltCount[2])+"/"+str(sum(FiltCount))+"\n")
+Outlog.write("\t Number of Missense variants selected (Med/High/Total): "+str(MissenseCount[0])+"/"+str(MissenseCount[1])+"/"+str(MissenseCount[2])+"/"+str(sum(MissenseCount))+"\n")
+Outlog.write("\t Number of Nonsense variants selected (Med/High/Total): "+str(NonsenseCount[0])+"/"+str(NonsenseCount[1])+"/"+str(NonsenseCount[2])+"/"+str(sum(NonsenseCount))+"\n")
+Outlog.write("\t Number of NonFrameshift InDels selected (Med/High/Total): "+str(NonFrameshiftCount[0])+"/"+str(NonFrameshiftCount[1])+"/"+str(NonFrameshiftCount[2])+"/"+str(sum(NonFrameshiftCount))+"\n")
+Outlog.write("\t Number of Frameshift InDels selected (Med/High/Total): "+str(FrameshiftCount[0])+"/"+str(FrameshiftCount[1])+"/"+str(FrameshiftCount[2])+"/"+str(sum(FrameshiftCount))+"\n")
+Outlog.write("\t Number of Splice site variants selected (Med/High/Total): "+str(SplicingCount[0])+"/"+str(SplicingCount[1])+"/"+str(SplicingCount[2])+"/"+str(sum(SplicingCount))+"\n")
+Outlog.write("\t Number of Silent function variants selected (Med/High/Total): "+str(SilentCount[0])+"/"+str(SilentCount[1])+"/"+str(SilentCount[2])+"/"+str(sum(SilentCount))+"\n")
+Outlog.write("\t Number of Unknown function variants selected (Med/High/Total): "+str(UnknownCount[0])+"/"+str(UnknownCount[1])+"/"+str(UnknownCount[2])+"/"+str(sum(UnknownCount))+"\n")
 Outlog.write("\n")
 TimeNow=str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
 Outlog.write("Filtering Finished: "+TimeNow+"\n")
