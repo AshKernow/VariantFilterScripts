@@ -10,6 +10,7 @@
 
 
 from optparse import OptionParser
+import gzip
 import os
 
 parser = OptionParser()
@@ -26,7 +27,16 @@ parser.add_option("-W", "--within", action='store_true', dest="WITHIN", help="Fi
 
 (options, args) = parser.parse_args()
 
-VCF=open(options.VCFfile,'r')
+FilTyp=str(options.VCFfile)
+FilTyp=FilTyp.split(".")
+FilTyp=str(FilTyp[-1])
+if FilTyp == 'gz':
+    VCF=gzip.open(options.VCFfile,'r')
+elif FilTyp == 'vcf':
+    VCF=open(options.VCFfile,'r')
+else:
+    print "Incorrect vcf file type"
+    sys.exit(1)
 BaseName=str(options.OutputFileName)
 MafCutOff=float(options.MAFFilter)
 GreaterThan=options.GREATER
