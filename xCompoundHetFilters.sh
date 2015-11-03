@@ -3,28 +3,25 @@
 
 
 ## use "0" for missing parent
-
+ArrNum=1
 #get arguments
-while getopts v:t:n:p: opt; do
+while getopts v:t:n:a:p: opt; do
     case "$opt" in
         v) VcfFil="$OPTARG";;
         t) FamFil="$OPTARG";;
         n) DirPre="$OPTARG";;
+        a) ArrNum="$OPTARG";;
         p) AddPrm="$OPTARG";;
         #H) echo "$usage"; exit;;
     esac
 done
 
-FiltScrDir="/ifs/scratch/c2b2/af_lab/ads2202/Exome_Seq/scripts/Filtering_scripts/"
+echo "Starting"
+
+FiltScrDir="/home/local/ARCS/ads2202/scripts/Filtering_scripts"
 
 VcfFil=`readlink -f $VcfFil`
 FamFil=`readlink -f $FamFil`
-
-if [[ "$SGE_TASK_ID" != "undefined" ]]; then
-        ArrNum=$SGE_TASK_ID
-else
-        ArrNum=1
-fi
 
 FamNam=`cut -f 1 $FamFil | head -n $ArrNum | tail -n 1`
 ModNam=`cut -f 2 $FamFil | head -n $ArrNum | tail -n 1`
@@ -38,6 +35,16 @@ DirNam=$FamNam
 if [[ -n $DirPre ]]; then DirNam=$DirPre"_"$DirNam; fi
 mkdir -p $DirNam
 cd $DirNam
+
+LogFil=$FamNam.compound_heterozygous.log
+
+echo "Start :`date`"
+echo "VCF file: $VcfFil"
+echo "Filter file: $FamFil"
+if [[ ! -e $VcfFil ]] | [[ ! -e $FamFil ]]; then "Missing/Incorrect required arguments"; exit; fi
+
+
+
 
 #get paternally interited allele
 PatPrm=$FilPrm
@@ -54,6 +61,7 @@ fi
 CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.tempheppat $PatPrm -P -f 0.03"
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
+echo `date`
 eval $CMD
 
 
@@ -71,7 +79,12 @@ fi
 CMD="$FiltScrDir/ExmFilt.CustomGenotype.py -v $VcfFil -o $FamNam.temphepmat $MatPrm -P -f 0.03"
 if [[ ! -z $AddPrm ]]; then CMD=$CMD" $AddPrm"; fi
 echo $CMD
+echo `date`
 eval $CMD
+
+echo "Run R script to find compound het"
+echo `date`
+
 R --vanilla <<RSCRIPT
 options(stringsAsFactors=F)
 
@@ -85,11 +98,35 @@ comphet <- rbind(mathet, pathet)
 comphet <- comphet[order(comphet[,"Chromosome"], comphet[,"Position"]),]
 write.table(comphet, "$FamNam.compound_heterozygous.tsv", col.names=T, row.names=F, quote=F, sep="\t")
 RSCRIPT
-cat $FamNam.tempheppat.log $FamNam.temphepmat.log > $FamNam.compound_heterozygous.log
+
+echo "Paternal Filtering" > $LogFil
+echo "---------------------------------------------------" >> $LogFil
+cat $FamNam.tempheppat.log >> $LogFil
+echo "" >> $LogFil
+echo "===================================================" >> $LogFil
+echo "" >> $LogFil
+
+echo "Maternal Filtering" >> $LogFil
+echo "---------------------------------------------------" >> $LogFil
+cat $FamNam.temphepmat.log >> $LogFil
+echo "" >> $LogFil
+echo "===================================================" >> $LogFil
+echo "" >> $LogFil
+
+
 rm -rf *temphep*
 LEN=`cat $FamNam.compound_heterozygous.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    CMD="qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.compound_heterozygous.tsv"
-    echo $CMD
+    CMD="nohup $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.compound_heterozygous.tsv &"
+    echo $CMD >> $LogFil
     eval $CMD
 fi
+
+GENLEN=`cut -f 6 $FamNam.compound_heterozygous.tsv | tail -n +2 | sort | uniq | wc -l`
+
+
+echo "Final Number of variants: $LEN in $GENLEN genes" >> $LogFil
+echo "" >> $LogFil
+echo "===================================================" >> $LogFil
+
+echo "Finished `date`"
