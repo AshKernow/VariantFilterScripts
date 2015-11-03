@@ -1,12 +1,6 @@
 #!/bin/bash
 #$ -cwd -l mem=1G,time=:30: -N FilterTwin
 
-#hpc workarounds
-if [[ /bin/hostname==*.hpc ]]; then 
-source /etc/profile.d/sge.sh  # SGE commands from within node
-source /ifs/home/c2b2/af_lab/ads2202/.bash_profile
-fi
-
 #get arguments
 while getopts v:t:n:p:f:a:b:u: opt; do
     case "$opt" in
@@ -22,7 +16,7 @@ while getopts v:t:n:p:f:a:b:u: opt; do
     esac
 done
 
-FiltScrDir="/ifs/scratch/c2b2/af_lab/ads2202/Exome_Seq/scripts/Filtering_scripts/"
+FiltScrDir="/home/local/ARCS/ads2202/scripts/Filtering_scripts"
 
 VcfFil=`readlink -f $VcfFil`
 
