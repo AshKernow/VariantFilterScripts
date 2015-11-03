@@ -1,34 +1,27 @@
 #!/bin/bash
 #$ -cwd -l mem=1G,time=1:: -N FilterFam
 
-#hpc workarounds
-if [[ /bin/hostname==*.hpc ]]; then 
-source /etc/profile.d/sge.sh  # SGE commands from within node
-source /ifs/home/c2b2/af_lab/ads2202/.bash_profile
-fi
+ArrNum=1
+
+usage="xFamilyFilters.sh -v <vcf file> -t <Filter Table> -n <Output Directory> -a <The line of the Trio Table to analyse> -p <Additional Parameters> -H <this message>"
 
 #get arguments
-while getopts v:t:n:p: opt; do
+while getopts v:t:n:a:p:H opt; do
     case "$opt" in
         v) VcfFil="$OPTARG";;
         t) FamFil="$OPTARG";;
         n) DirPre="$OPTARG";;
+        a) ArrNum="$OPTARG";;
         p) AddPrm="$OPTARG";;
-        #H) echo "$usage"; exit;;
+        H) echo "$usage"; exit;;
     esac
 done
 
-FiltScrDir="/ifs/scratch/c2b2/af_lab/ads2202/Exome_Seq/scripts/Filtering_scripts/"
+FiltScrDir="/home/local/ARCS/ads2202/scripts/Filtering_scripts"
 
 VcfFil=`readlink -f $VcfFil`
 FamFil=`readlink -f $FamFil`
 
-
-if [[ "$SGE_TASK_ID" != "undefined" ]]; then
-        ArrNum=$SGE_TASK_ID
-else
-        ArrNum=1
-fi
 
 FamNam=`cut -f 1 $FamFil | head -n $ArrNum | tail -n 1`
 ModNam=`cut -f 2 $FamFil | head -n $ArrNum | tail -n 1`
@@ -74,5 +67,5 @@ RSCRIPT
 fi
 LEN=`cat $FamNam.$ModNam.tsv | wc -l`
 if [[ $LEN -gt 1 ]]; then
-    qsub $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.$ModNam.tsv
+    nohup $FiltScrDir/xAnnotateVariantTSV.sh -i $FamNam.$ModNam.tsv &
 fi
