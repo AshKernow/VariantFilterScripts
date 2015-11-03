@@ -2,21 +2,17 @@
 #$ -cwd -l mem=1G,time=1:: -N AnnTSV
 
 # The purpose of this script to annotate a tab separated files containing lists of target variants. The file firsts gets ClinVar annotations from Annovar. The R script adds annotations from ClinVar at the variants level, and then annotations from a custom annotation table at the gene level.
-# The input can either be a single tsv file or a list of tsv files. In the latter case the script should be called as an array job (qsub -t 1-X, where X is the number of lines in the file), each array job will run on a single tsv.
+
+usage="-i <InputFile> -o <OutputName - optional> -H <This message>"
 
 #get arguments
-while getopts i:o: opt; do
+while getopts i:o:H opt; do
     case "$opt" in
         i) InpFil="$OPTARG";;
         o) OutFil="$OPTARG";;
-        #H) echo "$usage"; exit;;
+        H) echo "$usage"; exit;;
     esac
 done
-
-#check for array and if appropriate get the file name from the provided list
-if [[ ! -z $SGE_TASK_ID ]] && [[ $SGE_TASK_ID != "undefined" ]];then
-    InpFil=`head -n $SGE_TASK_ID $InpFil | tail -n 1`
-fi
 
 #if not output name has been specified derive it from the input file name
 if [[ -z $OutFil ]]; then 
@@ -26,8 +22,8 @@ else
 fi
 
 # location of annovar database adn the custom annotation table
-AnnDir=/ifs/scratch/c2b2/af_lab/ads2202/bin/annovar
-AnnTab=/ifs/scratch/c2b2/af_lab/ads2202/Exome_Seq/resources/VariantsAnnotationPipeline/Final_Gene_Annotation_Table.txt
+AnnDir=/home/local/ARCS/ads2202/resources/annovar
+AnnTab=/home/local/ARCS/ads2202/resources/VariantAnnotationTables/Final_Gene_Annotation_Table.txt
 
 echo $InpFil
 echo $OutFil
@@ -62,10 +58,15 @@ eval $CMD2
 ##annotate using R
 R --vanilla <<RSCRIPT
 options(stringsAsFactors=F)
+
 #get data
 dat.all <- read.delim("$InpFil", colClasses="character")
-
 dat <- dat.all[,1:(grep("AlternateAlleles", colnames(dat.all)))]
+
+#get the population specific frequencies
+popfrqcol <- which(colnames(dat.all)%in%c("ESP.aa", "ESP.ea", "1KG.eur", "1KG.amr", "1KG.eas", "1KG.afr", "1KG.sas", "ExAC.afr", "ExAC.amr", "ExAC.eas", "ExAC.fin", "ExAC.nfe", "ExAC.oth", "ExAC.sas"))
+POPFREQ <- dat.all[,popfrqcol]
+
 # Add a AAF column for Wen-I
 ADcols <- grep("AD$", colnames(dat))
 GTcols <- grep("GT$", colnames(dat))
@@ -77,7 +78,7 @@ for(j in 1:length(ADcols)){
     colnames(dat)[ncol(dat)] <- nam
     for(i in 1:nrow(dat)){
         AAs <- as.numeric(strsplit(dat[i,GTcol], "/")[[1]])
-        AAs <- AAs[AAs!=0]+1
+        AAs <- unique(AAs[AAs!=0]+1)
         ADs <- as.numeric(strsplit(dat[i,ADcol], ",")[[1]])
         tot <- sum(ADs)
         AAFs <- round(ADs[AAs]/tot,5)
@@ -95,12 +96,14 @@ annot <- read.delim("$AnnTab")
 annmat <- match(gsub(",.*", "", dat[,"Gene"]), annot[,"GENE"])
 annot <- annot[annmat,]
 if(any(is.na(annot[,1]))) { annot[is.na(annot[,1]),] <- "." } #replace missing data (NA) with "."
+
 #get clinvar and match by variatns (CHR_POS_REF_ALT)
 CLINVAR <- read.table("$TempInp.hg19_multianno.txt", skip=1)
   #need to match to specific variant, use the original variants that are at the end of the annovar output
 clinmat <- match(paste(dat[,1], dat[,2], dat[,4], dat[,5]), paste(CLINVAR[,7], CLINVAR[,8], CLINVAR[,10], CLINVAR[,11]))
 CLINVAR <- CLINVAR[clinmat,6]
 if(any(is.na(CLINVAR))){CLINVAR[is.na(CLINVAR)] <- "."} #replace missing data (NA) with "."
+
 #Create TOLERANCE.specific column with variant types
 TOLERANCE.specific <- rep(".", nrow(dat))
 whi <- which(dat[,"VariantClass"]=="synonymousSNV")
@@ -113,44 +116,52 @@ whi <- which(grepl("splicing", dat[,"VariantFunction"]))
 if(length(whi)>0){TOLERANCE.specific[whi] <- annot[whi,"TOLERANCE_SPLICE"]}
 whi <- which(grepl("^frameshift", dat[,"VariantClass"]))
 if(length(whi)>0){TOLERANCE.specific[whi] <- annot[whi,"TOLERANCE_FRAMESHIFT"]}
-#find columns to split annot at 
+
+#insert TOLERANCE.specific column into annot and remove individual columns for each variant type
 col1 <- grep("TOLERANCE_ALL_DALY", colnames(annot))
 col2 <- grep("TOLERANCE_FRAMESHIFT", colnames(annot))+1
-out <- cbind(dat, CLINVAR, annot[,2:col1], TOLERANCE.specific, annot[,col2:ncol(annot)])
-splicord <- grepl("splicing", out[,"VariantFunction"]) #sort splicing to the nonsense to the top
-nonseord <- grepl("stop", out[,"VariantClass"]) # then stopgain/stoploss
-indelfsord <- grepl("^frameshift", out[,"VariantClass"]) # then frameshift indels
-indelnford <- grepl("nonframeshift", out[,"VariantClass"]) # then non-frameshift indels
-qualord <- match(out[,"VariantCallQuality"], c("Low","Med", "High")) #then high quality variants (sort order is "decreasing", so "M" would come above "H")
-predord <- match(out[,"PredictionSummary"], c("Med", "High")) #then high likelihood deleterious missense (sort order is "decreasing", so "M" would come above "H")
+ANNOT <- cbind(annot[,2:col1], TOLERANCE.specific, annot[,col2:ncol(annot)])
+
+#combine annotations
+out <- cbind(dat, CLINVAR, ANNOT, POPFREQ)
+
+
+#sort the file so that most likely candidates are at the top...
+predord <- match(out[,"PredictionSummary"], c("Med", "High"))        #...sort high likelihood deleterious missense to the top
+splicord <- grepl("splicing", out[,"VariantFunction"])               #...then splicing to the nonsense to the top of those
+nonseord <- grepl("stop", out[,"VariantClass"])                      #...then stopgain/stoploss
+indelfsord <- grepl("^frameshift", out[,"VariantClass"])             #...then frameshift indels
+indelnford <- grepl("nonframeshift", out[,"VariantClass"])           #...then non-frameshift indels
+qualord <- match(out[,"VariantCallQuality"], c("Low","Med", "High")) #...then high quality variants
+cadd <- out[,"CADDscore"]                                            #...final sort by CADD and then GERP
+gerp <- out[,"GERP.."]                                               #...and then GERP
+ord <- order(predord, splicord, nonseord, indelfsord, indelnford, qualord, cadd, gerp, decreasing=T)
+out <- out[ord,]
+
+#Truncate fields that are too long for a single Excel cell
 for(i in 1:ncol(out)){
   cnt <- which(nchar(out[,i])>32760)
   if(length(cnt)>0){
     out[cnt,i] <- paste(substr(out[cnt,i], 1, 32700), ":::---TRUNCATED_FOR_EXCEL")
   }
 }
-ord <- order(predord, splicord, nonseord, indelfsord, indelnford, qualord, out[,"CADDscore"], out[,"GERP.."], decreasing=T) #final sort by CADD and then GERP
-write.table(out[ord,], "$OutFil", sep="\t", col.names=T, row.names=F, quote=F)
+
+## Adjust column headers
+colnames(out) <- gsub("GERP..", "GERP++", colnames(out))
+colnames(out) <- gsub("prediction", "", colnames(out))
+colnames(out) <- gsub("^MA$", "Mutation Assessor", colnames(out))
+colnames(out) <- gsub("^MT$", "Mutation Taster", colnames(out))
+colnames(out) <- gsub("^PP2$", "PolyPhen2", colnames(out))
+colnames(out) <- gsub("^CADDscore$", "CADD score", colnames(out))
+
+#OUTPUT
+write.table(out, "$OutFil", sep="\t", col.names=T, row.names=F, quote=F)
 RSCRIPT
 
 if [[ $? -gt 0 ]]; then
     echo "Annotation Failed"
     exit
 fi
-
-
-## Adjust headers
-cat $OutFil | awk '{ if ( $1 == "Chromosome" ){
-    gsub ( /GERP../, "GERP++");
-    gsub ( /prediction/, "");
-    gsub ( /\<MA\>/, "Mutation Assessor");
-    gsub ( /\<MT\>/, "Mutation Taster");
-    gsub ( /\<PP2\>/, "PolyPhen2");
-    gsub ( /\<CADDscore\>/, "CADD score");
-    gsub ( /\.1/, "");
-    };
-    print }' > $OutFil.temp
-mv $OutFil.temp $OutFil
 
 # remove temporary files
 rm -f $InpFil.tempann*
